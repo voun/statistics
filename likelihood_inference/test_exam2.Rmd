@@ -1,0 +1,93 @@
+---
+title: "test_exam2"
+output: pdf_document
+author: "Andreas Dahlberg"
+---
+
+```{r}
+
+data <- get(load("gpd.RData"))
+pdf <- function(x,sigma,eps){
+  
+  if (eps == 0)
+    1/sigma*exp(-x/sigma)
+  else
+    1/sigma*(eps*x/sigma+1)^(-1/eps*(eps+1))
+}
+
+log_likeli <- function(x){
+  sum(log(pdf(data,x[1],x[2])))
+}
+
+ML = optim(c(1,1),function(x) -log_likeli(x))$par
+max = log_likeli(ML)
+
+eps = seq(-1,2,length=200)
+sigma = seq(5,20,length=200)
+grid = expand.grid(sigma,eps)
+z = apply(grid,1,function(x) log_likeli(x)-max)
+z = array(z,c(200,200))
+contour(sigma,eps,z,levels=0:-5,ylab="eps",xlab="sigma")
+points(9,0.2,pch=19,col="blue")
+contour(sigma,eps,z,levels=c(-qchisq(0.95,2)/2),col="PURPLE",add=TRUE)
+
+
+eps = seq(0,1.5,length=150)
+sigma = seq(6,18,length=150)
+profile_log_likeli_eps <- function(eps){
+  ml = optim(10,function(sigma) -log_likeli(c(sigma,eps)),method="BFGS")$par
+  ml
+}
+profile_log_likeli_sigma <- function(sigma){
+  ml = optim(0,function(eps) -log_likeli(c(sigma,eps)),method="BFGS")$par
+  ml
+}
+
+lines(sapply(eps,profile_log_likeli_eps),eps,type="l",col="green")
+lines(sigma,sapply(sigma,profile_log_likeli_sigma),type="l",col="red")
+
+
+
+prof_likeli <- function(eps){
+  log_likeli(c(profile_log_likeli_eps(eps),eps))
+}
+
+plot(eps,sapply(eps,prof_likeli),col="green",type="l")
+lines(eps,sapply(eps,function(eps) log_likeli(c(ML[1],eps))),col="blue",type="l")
+
+
+
+
+```
+The relative log likelihood in (9,0.2) is about -4 which is a low value so we can probably reject the null hypothesis. The relative log likelihood should be interpreted as: the higher the value the more likeli this point/set of parameters is.
+
+
+Suppose we want to do inference about $\xi$, i.e $\sigma$ is a nuissance parameters. In the estimated log likelihood we just plug in the ML-estimate of $\sigma$ to get a likelihood function containing only $\xi$. However, this doesn't capture the uncertainty in the estimation of $\xi$. The profile log likelihood tries to capture this. In the plot we see that this is indeed the case. The estimated log likelihood has a higher curvature than the profile log likelihood.
+
+If we use Wald to find a confidence interval for $\xi$ then this will be symmetric and not respecting the parameter space. In some cases this can be bad. When we have the profile log likelihood in hand we can instead find a likelihood ratio confidence interval. In this confidence interval we basically want to find the values for $\xi$ which satisfy $-2\ell_p(\xi) \leq \theta$ where $\theta$ depends on the confidence level. Since the profile log-likelihood is in this case non-symmetric we see that we get a non-symetric CI and also respecting parameter space.
+
+```{r}
+
+opt = optim(c(1,1),function(x) -log_likeli(x),hessian=TRUE)
+ML = opt$par
+obsfisher_info = opt$hessian
+se = sqrt(diag(solve(obsfisher_info)))
+wald_sigma = ML[1]+c(-1,1)*1.96*se[1]
+wald_eps = ML[2]+c(-1,1)*1.96*se[2]
+
+max = log_likeli(ML)
+
+
+
+eps = seq(-1,2,length=200)
+sigma = seq(5,20,length=200)
+contour(sigma,eps,z,levels=0:-5,ylab="eps",xlab="sigma")
+
+
+rect(xleft=wald_sigma[1],xright=wald_sigma[2],ybottom=wald_eps[1],ytop = wald_eps[2],col = rgb(0.7, 0.7, 0.7, 0.4))
+.filled.contour(sigma,eps,z,levels=c(-qchisq(0.95,2)/2,0),col= rgb(1, 0, 0, 0.3))
+points(ML[1],ML[2],pch=19,col="black")
+
+
+```
+

@@ -1,0 +1,107 @@
+---
+title: "ex9"
+output: pdf_document
+---
+
+```{r}
+library(leaps)
+beta0=2
+sigma=1
+n=200 #observations
+set.seed(2)
+# 1000 datasets
+X = matrix(nrow=n,ncol=10,data=rnorm(n*10,0,1))
+Y = matrix(nrow=1000,ncol=n,data=rnorm(1000*n,0,1))+beta0
+pvals = rep(0,1000)
+for (i in 1:1000){
+  fit = lm(Y[i,]~X[,1]+X[,2]+X[,3]+X[,4]+X[,5]+X[,6]+X[,7]+X[,8]+X[,9]+X[,10])
+  pvals[i] = summary(fit)$coefficients[2,4]
+}
+hist(pvals,col="BLUE",prob=FALSE) #seems to be uniform, which it should be
+
+## now we do best subset selection Mallow's Cp to find best model
+pvals = c()
+for (i in 1:1000){
+  df = data.frame(y=Y[i,],x1=X[,1],x2=X[,2],x3=X[,3],x4=X[,4],x5=X[,5],x6=X[,6],x7=X[,7],x8=X[,8],x9=X[,9],x10=X[,10])
+  regfit = regsubsets(y~.,data=df,nvmax=10) #note this doesnt take the empty model into account
+  cps = summary(regfit)$cp                  ## but it doesnt matter since only record p value if contains x1
+  ind = which(cps == min(cps))
+  
+  list = names(coef(regfit,ind)) #here the first is intercept, which we dont want
+  list = list[2:length(list)]
+  if(is.element("x1",list)){
+    fit = lm(y ~.,data=df[,c("y",list)])
+    pvals = append(pvals,summary(fit)$coefficients[2,4])
+  }
+  
+}
+hist(pvals,col="BLUE",prob=FALSE) ## now not uniform anymore
+
+pvals = c()
+for (i in 1:1000){
+  train = sample(1:200,100,replace=FALSE)
+  df = data.frame(y=Y[i,],x1=X[,1],x2=X[,2],x3=X[,3],x4=X[,4],x5=X[,5],x6=X[,6],x7=X[,7],x8=X[,8],x9=X[,9],x10=X[,10])
+  regfit = regsubsets(y~.,data=df[train,],nvmax=10) #note this doesnt take the empty model into account
+  cps = summary(regfit)$cp                  ## but it doesnt matter since only record p value if contains x1
+  ind = which(cps == min(cps))
+  
+  list = names(coef(regfit,ind)) #here the first is intercept, which we dont want
+  list = list[2:length(list)]
+  if(is.element("x1",list)){
+    fit = lm(y ~.,data=df[-train,c("y",list)])
+    pvals = append(pvals,summary(fit)$coefficients[2,4])
+  }
+  
+}
+
+hist(pvals,col="BLUE",prob=FALSE) ## now not uniform anymore
+
+
+```
+
+
+
+```{r}
+library(MASS)
+library(splines)
+data(Boston)
+Boston = Boston[,c("dis","nox")]
+Boston = Boston[order(Boston$nox,decreasing=FALSE),]
+dis = Boston$dis
+nox = Boston$nox
+fit = lm(dis~poly(nox,degree=3)) #dis mot grad 3 nox
+plot(nox,fitted.values(fit),type="l",col="blue")
+points(nox,dis,col="red")
+
+RSSs1 = rep(0,10)
+BICs = rep(0,10)
+for(i in 1:10){
+  fit = lm(dis~poly(nox,degree=i))
+  rss = sum(summary(fit)$residuals^2)
+  RSSs1[i] = rss
+  BICs[i] = BIC(fit)
+}
+ind = which(BICs == min(BICs))
+
+
+fit = lm(dis~bs(nox,df=6,degree=3))
+plot(nox,fitted.values(fit),type="l",col="blue") # 3 knots and cubic spline (default)
+points(nox,dis,col="red")
+
+errors = rep(0,10)
+folds = cut(1:length(dis),breaks=10,labels=FALSE)
+for(i in 1:10){
+  inds = which(folds == i)
+  fit = lm(dis~bs(nox,df=6,degree=i),data=Boston[-inds,])
+  y.pred = predict(fit,Boston[ind,])
+  errors[i] = errors[i] + mean((y.pred-dis[inds])^2)
+}
+errors = errors/10
+ind = which(errors == min(errors))
+
+fit = lm(dis~bs(nox,df=6,degree=ind))
+plot(nox,fitted.values(fit),type="l",col="blue")
+points(nox,dis,col="red")
+
+```
+

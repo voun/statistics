@@ -1,0 +1,115 @@
+---
+title: "Labb 11"
+output: pdf_document
+---
+
+
+##Problem 20
+
+**1a)**
+It seems reasonable that the income will decrease with illiteracy and that the amount of murders will increase with illiteracy. Also, it very unlikely that this kind of relationship would be anything else but linear. Otherwise it would mean that the amount of murders/income will increase/decrease very fast with illiteracy. Below we see the two plots with regression lines. The confidence intervals show that we can reject the null hypothesis (on 5% significane level) that the slope is 0, i.e there is no linear relationship between murder/income and illiteracy.
+
+Furthermore, with these regression lines we can do prediction. I.e, if we get a new illiteracy we can construct a 95% confidence interval for the amount of murders and income.
+```{r}
+states <- as.data.frame(state.x77[, c("Murder", "Population", "Illiteracy", "Income", "Frost")])
+
+illiteracy = states$Illiteracy
+murder = states$Murder
+income = states$Income
+
+
+par(mfrow = c(1,2))
+plot(illiteracy,income,col="green")
+ill_inc.lm = lm(income ~ illiteracy )
+abline(ill_inc.lm)
+
+
+plot(illiteracy,murder,col="blue")
+ill_murdl.lm = lm(murder ~ illiteracy)
+abline(ill_murdl.lm)
+
+
+confint(ill_inc.lm,level=0.95)
+print("****")
+confint(ill_murdl.lm,level=0.95)
+
+
+
+```
+
+**1b**)
+
+```{r}
+states <- as.data.frame(state.x77[, c("Murder", "Population", "Illiteracy", "Income", "Frost")])
+
+illiteracy = states$Illiteracy
+murder = states$Murder
+income = states$Income
+frost = states$Frost
+population = states$Population
+
+lm = lm(murder ~ illiteracy+income+frost+population)
+lm
+confint(lm)
+
+X = matrix(c(rep(1,length(murder)),population,illiteracy,income,frost),nrow=length(murder))
+
+y = murder
+est = solve(t(X)%*%X)%*%(t(X)%*%y)
+est
+
+```
+The coefficients should be interpreted as how much the murder variable increases when keeping everything fixed and increasing a predictor variable by 1 unit. It seems as if illiteracy has the biggest impact on murders and income the smallest. The confidence interval shows that we can reject the null hypothesis that (on 5% significance level) that there is no linear relationship between murder and illiteracy. We can also note that we can not reject the null hypothesis that there is no relationship between murder and income. So it could be the case that the income does not affect murder rate.
+
+We see that the coefficients are almost the same as the ones obtained using R's lm-function.
+
+
+##Problem 21##
+
+```{r}
+library(MASS)
+states <- as.data.frame(state.x77[, c("Murder", "Population", "Illiteracy", "Income", "Frost")])
+
+illiteracy = states$Illiteracy
+murder = states$Murder
+income = states$Income
+frost = states$Frost
+population = states$Population
+n = length(murder)
+
+lm4 = lm(murder ~  population+illiteracy+income+frost)
+
+## AIC with 4 predicots
+X = matrix(c(rep(1,n),population,illiteracy,income,frost),nrow=length(murder))
+
+y = murder
+beta = solve(t(X)%*%X)%*%(t(X)%*%y)
+sigma2 = 1/n*t(y-X%*%beta)%*%(y-X%*%beta)
+
+AIC4 = 2*n*log(sqrt(2*pi))+2*n*log(sqrt(sigma2))+1/sigma2*t(y-X%*%beta)%*%(y-X%*%beta)+2*(5+1)
+AIC4
+AIC(lm4)
+
+
+## AIC with 2 predictors
+
+X = matrix(c(rep(1,length(murder)),population,illiteracy),nrow=length(murder))
+lm2 = lm(murder ~  population+illiteracy)
+
+y = murder
+beta = solve(t(X)%*%X)%*%(t(X)%*%y)
+sigma2 = 1/n*t(y-X%*%beta)%*%(y-X%*%beta)
+
+AIC2 = 2*n*log(sqrt(2*pi))+2*n*log(sqrt(sigma2))+1/sigma2*t(y-X%*%beta)%*%(y-X%*%beta)+2*(3+1)
+AIC2
+AIC(lm2)
+
+###
+
+k = stepAIC(lm4,direction="backward")
+
+```
+
+We see that the AIC is lower when using only population and illiteracy as predictors compared to the AIC when using population,illiteracy,income and frost as predictors. This means that we should go for the model that uses only two predictors since it fits our data better.
+
+The stepAIC function starts with all variables as predictors and then removes variables and finds the model that has the the smallest AIC. This turns out to be the one when we have only population and illiteracy as predictors.

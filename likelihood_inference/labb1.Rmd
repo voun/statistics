@@ -1,0 +1,94 @@
+---
+title: "Lab 1"
+author: "Andreas Dahlberg"
+output:
+  pdf_document: default
+---
+#Problem 1
+**1a)**
+
+```{r}
+dwei <- Vectorize(function(x,k,s){
+  
+  if (x < 0)
+    0
+  else 
+    k/s*(x/s)^(k-1)*exp(-(x/s)^k)
+  
+}) 
+x <- seq(0,7,length = 100)
+k = c(0.5,1.0,1.5,5.0)
+kStr = c("k=0.5","k=1.0","k=1.5","k=5.0")
+s = c(1,1.5,2)
+
+par(mfrow = c(2,2))
+for(i in 1:4){
+  plot(x,dwei(x,k[i],s[1]),col="blue",lty=1,ylim=c(0,2),type="l",ylab="y")
+  title(kStr[i])
+  lines(x,dwei(x,k[i],s[2]),col="green",lty=2,ylim=c(0,2),type="l",ylab="y")
+  lines(x,dwei(x,k[i],s[3]),col="red",lty=3,ylim=c(0,2),type="l",ylab="y")
+  legend("topright",legend=c("s=0.5","s=1.5","s=2"),col=c("blue","green","red")
+         ,lty=1:3,bty="n",cex=0.25)
+}
+```
+
+**1b)**
+
+```{r}
+
+dwei <- Vectorize(function(x,k,s){
+  
+  if (x < 0)
+    0
+  else 
+    k/s*(x/s)^(k-1)*exp(-(x/s)^k)
+  
+}) 
+x <- seq(0,7,length = 1000)
+strings = c("k<1","k=1","k>1")
+kLessThan1 = c(0.1,0.25,0.5,0.75)
+kIs1 = c(1)
+kLargerThan1 = c(1.5,3,6,15)
+colours = c("black","blue","red","green")
+values = list(kLessThan1,kIs1,kLargerThan1) 
+par(mfrow = c(1,3))
+
+for(i in 1:3){
+  
+  vec = unlist(values[i])
+  ks = c()
+  for(j in 1:length(vec)){
+    
+    if((vec[j])%%1 == 0) 
+      ks = append(ks,paste("k=",sprintf("%d",vec[j]),sep=""))
+    else
+      ks = append(ks,paste("k=",sprintf("%1.2f",vec[j]),sep=""))
+    
+    if (j ==1){
+      plot(x,dwei(x,vec[j],1),col=colours[j],ylim=c(0,2.5),ylab="y",type="l",lty=1)
+      title(strings[i])
+    }
+    else
+      lines(x,dwei(x,vec[j],1),col=colours[j],ylim=c(0,2.5),ylab="y",type="l",lty=1)
+  }
+  legend("topright",legend=ks,col=colours[1:length(vec)],lty=rep(1,length(vec)),
+         bty="n",cex=0.75)
+}
+
+```
+
+For $0<k<1$ the density function approaches infinity when $x \rightarrow 0^+$ and is  decreasing. When $k = 1$ the density function converges to some number (in this case the number is around 1) when $x \rightarrow 0+$, and the function is also decreasing. When $k > 1$ the density function approaches 0 when $x \rightarrow 0^+$ and is increasing until some number and after that decreasing. In all three cases the function goes to 0 when $x \rightarrow \infty$.
+
+#Problem 2
+**2a) and 2b)**
+
+```{r}
+
+data <- read.csv("/Users/andreas/Documents/workspace/R/hospital.csv")
+hist(data$stay)
+any(data$stay == 0) 
+```
+The variable "stay" could be Poisson distributed since it only takes integer values $\geq 0$ and usually small values and not so often large values, which characterises the Poisson distribution.
+
+The problem is that in our data "stay" is never 0. If it really is Poisson distributed then it should take the value 0 with probability $e^{-\lambda}$. It is therefore more likely that "stay" is zero-truncated poisson distributed.
+

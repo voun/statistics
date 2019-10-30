@@ -1,0 +1,50 @@
+---
+title: "ex11"
+output: pdf_document
+---
+```{r}
+library(tree)
+library(ISLR)
+library(randomForest)
+set.seed(1)
+data(Carseats)
+train = sample(1:nrow(Carseats),200,replace=FALSE)
+Carseats.train = Carseats[train,]
+Carseats.test.x = Carseats[-train,-1]
+Carseats.test.y = Carseats[-train,1]
+
+tree = tree(Sales~.,data=Carseats.train)
+plot(tree)
+text(tree,pretty=0)
+pred = predict(tree,Carseats.test.x)
+test.error1 = mean((pred-Carseats.test.y)^2)
+
+cv = cv.tree(tree)
+dev = cv$dev
+k = cv$k
+plot(k,dev,type="b") # points with lines
+k = k[which(dev == min(dev))[1]]
+if (k == -Inf){
+  k = -1000000
+}
+pruned.tree = prune.tree(tree,k)
+pred = predict(pruned.tree,Carseats.test.x)
+test.error2 = mean((pred-Carseats.test.y)^2)
+
+plot(pruned.tree)
+text(pruned.tree,pretty=0)
+
+##actually see increase in test error in this case
+
+bag.tree = randomForest(Sales~.,data=Carseats.train,mtry=10,importance=TRUE)
+pred = predict(bag.tree,Carseats.test.x)
+test.error3 = mean((pred-Carseats.test.y)^2)
+importance(bag.tree)
+varImpPlot(bag.tree)
+
+random.forest = randomForest(Sales~.,data=Carseats.train,mtry=9)
+pred = predict(random.forest,Carseats.test.x)
+test.error4 = mean((pred-Carseats.test.y)^2)
+
+```
+

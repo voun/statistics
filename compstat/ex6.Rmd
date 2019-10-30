@@ -1,0 +1,112 @@
+---
+title: "ex6"
+output: pdf_document
+---
+```{r}
+set.seed(10)
+nsimul = 100000
+
+duplicates_H0 <- function(npacks = 50){
+  sample = sample(1:682,npacks*5,replace=TRUE)
+  return(length(sample)-length(unique(sample)))
+}
+duplicates_HA <- function(npacks = 50){
+  sample = sample(1:682,npacks*5,replace=TRUE,prob = c(rep(5/1182,100),rep(1/1182,582)))
+  return(length(sample)-length(unique(sample)))
+  
+}
+
+dupli1 = replicate(nsimul,duplicates_H0())
+p1 = hist(dupli1,plot=FALSE)
+rej1 = quantile(dupli1,0.05)
+rej2 = quantile(dupli1,0.95)
+p_val = (sum((dupli1 <= 6))+1)/(length(dupli1)+1)
+
+dupli2 = replicate(nsimul,duplicates_HA())
+p2 = hist(dupli2,plot=FALSE)
+
+plot(p1, col=rgb(0,0,1,1/4), xlim=c(0,max(dupli1,dupli2)), freq=FALSE,ylim=c(0,.10),main=paste("number of packs = ",50)) 
+plot(p2, col=rgb(1,0,0,1/4), add=T, freq=FALSE)
+
+npacks = c(25,30,35,40)
+par(mfrow = c(2,2))
+for (i in 1:4){
+  
+  dupli1 = replicate(nsimul,duplicates_H0(npacks[i]))
+  dupli2 = replicate(nsimul,duplicates_HA(npacks[i]))
+  p1 = hist(dupli1,plot=FALSE)
+  p2 = hist(dupli2,plot=FALSE)
+  plot(p1, col=rgb(0,0,1,1/4), xlim=c(0,max(dupli1,dupli2)), freq=FALSE,ylim=c(0,.15),main=paste("number of packs = ",npacks[i])) 
+  plot(p2, col=rgb(1,0,0,1/4), add=T, freq=FALSE)
+  
+  rej = quantile(dupli1,0.95)
+  power = sum(dupli2 >= rej)/length(dupli2)
+  print(power)
+  
+  
+}
+```
+
+```{r}
+library(MASS)
+library(boot)
+# The values are rounded to minutes (from 2000 to 2018)
+# we assume the waiting times come from some gamma distribution
+# we want to find param theta which nbr such that less than this to 75%
+
+bs.samples = 1000
+boogg <- c(17, 26, 12, 6, 12, 18, 10, 12, 26, 13, 13, 11, 12, 35, 7, 21, 44, 10, 21)
+est = quantile(boogg,0.75)
+
+stripchart(boogg,method="stack",xlab="minutes",col="red")
+fit = fitdistr(boogg,"gamma")$estimate
+shape = fit[1]
+rate = fit[2]
+
+x = seq(0,50,length=500)
+hist(boogg,prob="TRUE",col="blue")
+lines(x,dgamma(x,shape=shape,rate=rate),col="red",type="l")
+
+statistic <- function(data){
+  return(quantile(data,0.75))
+}
+
+myBS <- function(n,shape,rate){
+  sample <- rgamma(n,shape=shape,rate=rate)
+  statistic(sample)
+}
+
+res = replicate(bs.samples,myBS(length(boogg),shape,rate))
+basic_ci = c(2*est-quantile(res,0.975),2*est-quantile(res,0.025))
+bias = mean(res)-est
+se = sqrt(var(res))
+
+normal_ci = est+c(-1,1)*1.96*se
+perc_ci = c(quantile(res,0.025),quantile(res,0.975))
+
+gen <- function(data, mle) {
+  rgamma(length(data),shape=mle[1],rate=mle[2])
+}
+
+air.boot <- boot(boogg, statistic, R=1000, sim = "parametric",
+                 ran.gen = gen,mle = c(shape,rate))
+ci = boot.ci(air.boot,conf=0.95,type=c("basic","norm","perc"))
+
+## now we do nonparametric bootstrap, i.e we don't know waiting times are gamma
+
+bs.sample <- function(data){
+  sample = sample(data,length(data),replace=TRUE)
+  statistic(sample)
+}
+
+res2 = replicate(bs.samples, bs.sample(boogg))
+basic_ci2 = c(2*est-quantile(res2,0.975),2*est-quantile(res2,0.025))
+bias2 = mean(res2)-est
+se2 = sqrt(var(res2))
+
+normal_ci2 = est+c(-1,1)*1.96*se2
+perc_ci2 = c(quantile(res2,0.025),quantile(res2,0.975))
+
+
+```
+

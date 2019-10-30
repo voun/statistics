@@ -1,0 +1,343 @@
+---
+title: "alley"
+output: pdf_document
+author: "Andreas Dahlberg"
+---
+
+```{r}
+x = seq(0,4,length = 100)
+s = c(1,1.5,2)
+k=c(0.5,1.0,1.5,5.0)
+par(mfrow = c(2,2))
+cols = c("GREEN","RED","BLUE")
+for(i in 1:4){
+  for(j in 1:3){
+    if (j == 1)
+      plot(x,dweibull(x,k[i],s[j]),col=cols[j],type="l",ylab="",xlab="x")
+    else
+      lines(x,dweibull(x,k[i],s[j]),col=cols[j],type="l",ylab="",xlab="x")
+  }
+}
+
+data = read.csv("hospital.csv")$stay
+hist(data,prob="TRUE",col="red",ylim=c(0,0.08))
+
+log_likeli <- function(l){
+  sum(dexp(data,l,log=TRUE))
+}
+opt = optim(1,function(l)-log_likeli(l),method="Brent",lower=0,upper=50)$par
+
+x <- seq(0,40,length=100)
+lines(x,dexp(x,opt),col="green",type="l")
+```
+
+```{r}
+## CTRL+SHIFT+c f??r kommentera flera lines
+data = get(load("exercise2.RData"))
+hist(data,prob="TRUE",col="BLUE",breaks=10,ylim=c(0,0.20))
+
+log_likeli <- function(x){
+  sum(dgamma(data,x[1],x[2],log=TRUE))
+}
+opt = optim(c(2.5,0.65),function(x)-log_likeli(x),hessian=TRUE)
+ML = opt$par
+max=log_likeli(ML)
+obs_fisher = opt$hessian
+se = sqrt(diag(solve(obs_fisher)))
+
+wald_shape = ML[1]+c(-1,1)*1.96*se[1]
+wald_scale = ML[2]+c(-1,1)*1.96*se[2]
+
+x = seq(0.01,10,length=100)
+lines(x,dgamma(x,ML[1],ML[2]),col="red")
+
+rel_log_likeli <- function(x){
+  log_likeli(x)-max
+}
+
+shape = seq(1,4.5,length=100)
+scale = seq(0.2,1.3,length=100)
+grid = expand.grid(shape,scale)
+z = apply(grid,1,rel_log_likeli) ## kan ocksa anvanda outer(shape,scale,rel_log_likeli) men maste da vara vectoriserad
+z = array(z,c(100,100))
+contour(shape,scale,z,levels=c(0,-0.3,-0.8,-1.5,-3.0,-3.5,-5,-7,-10),xlab="shape",ylab="scale")
+.filled.contour(shape,scale,z,levels=c(-qchisq(0.95,2)/2,0),col=rgb(1, 0, 0, 0.3)) #likelihood ratio CI
+rect(xleft=wald_shape[1],xright=wald_shape[2],ybottom=wald_scale[1],ytop=wald_scale[2],col = rgb(0.7, 0.7, 0.7, 0.4))
+points(ML[1],ML[2],pch=19,col="BLUE")
+
+contour(shape,scale,z,levels=c(0,-0.3,-0.8,-1.5,-3.0,-3.5,-5,-7,-10),xlab="shape",ylab="scale")
+points(ML[1],ML[2],pch=19,col="BLUE")
+
+prof_log_likeli_shape <- function(shape){
+  opt = optim(0.6,function(scale)-log_likeli(c(shape,scale)),method="Brent",lower=0,upper=50) #om ger NaNs anv??nd Brent och s??tt constraints p?? lower och upper!
+  opt$par
+}
+lines(shape,sapply(shape,prof_log_likeli_shape),col="GREEN",type="l")
+abline(h=ML[2],col="red")
+
+```
+
+
+```{r}
+data = read.csv("zurichtemp.csv")$Temperature
+log_likeli <- function(theta){
+  sum(dnorm(data,theta,sqrt(theta),log=TRUE))
+}
+theta = seq(5,27,length=200)
+plot(theta,sapply(theta,log_likeli),col="blue",type="l",ylab="log likeli")
+opt = optim(18,function(theta)-log_likeli(theta),method="Brent",lower=0,upper=50)
+ML = opt$par
+
+hist(data,prob="TRUE",col="blue",breaks=15)
+lines(theta,dnorm(theta,ML,sqrt(ML)),col="red",type="l")
+
+sizes = c(50,100,250,500)
+cols=c("RED","BLUE","GREEN","PURPLE")
+for (i in 1:4){
+  sample = rnorm(sizes[i],ML,sqrt(ML))
+  log_likeli2 <- function(theta){
+    sum(dnorm(sample,theta,sqrt(theta),log=TRUE))
+  }
+  ML2 = optim(18,function(theta)-log_likeli2(theta),method="Brent",lower=0,upper=50)$par
+  max = log_likeli2(ML2)
+  if (i==1)
+    plot(theta,sapply(theta,function(theta) log_likeli2(theta)-max),col=cols[i],type="l",ylab="")
+  else
+    lines(theta,sapply(theta,function(theta) log_likeli2(theta)-max),col=cols[i],type="l")
+    
+}
+```
+
+
+```{r}
+vec1 = c()
+vec2 = c()
+vec3 = c()
+vec4 = c()
+for (j in 1:500){
+  sample = runif(100,0,1)
+  vec1 = append(vec1,max(sample))
+  vec2 = append(vec2,mean(sample))
+  vec3 = append(vec3,median(sample))
+  vec4 = append(vec4,min(sample))
+}
+hist(vec1,col="blue",prob="TRUE",xlab="max",breaks=20)
+hist(vec2,col="blue",prob="TRUE",xlab="mean",breaks=20)
+hist(vec3,col="blue",prob="TRUE",xlab="median",breaks=20)
+hist(vec4,col="blue",prob="TRUE",xlab="min",breaks=20)
+
+```
+
+```{r}
+library(MASS)
+states <- as.data.frame(state.x77[, c("Murder", "Population", "Illiteracy", "Income", "Frost")])
+murder = states$Murder
+population = states$Population
+illiteracy = states$Illiteracy
+income = states$Income
+frost = states$Frost
+
+plot(illiteracy,murder,pch=19,col="blue",type="p") ##kan v??lja linje eller pkt h??r
+lm1 = lm(murder~illiteracy)
+abline(lm1)
+plot(income,murder,pch=19,col="green",type="p")
+lm2 = lm(murder~income)
+abline(lm2)
+
+confint(lm1,level=0.95)
+confint(lm2,level=0.95)
+
+illiteracy2 = illiteracy^2
+lm3 = lm(murder ~ illiteracy+illiteracy2)
+coeffs = (summary(lm3)$coefficients)[,1]
+fun <- function(x){
+  coeffs[1]+coeffs[2]*x+coeffs[3]*x^2
+}
+plot(illiteracy,murder,pch=19,col="blue",type="p")
+x = seq(0,3,length=100)
+lines(x,fun(x),col="red",type="l")
+confint(lm3,level=0.95)
+
+lm = lm(murder ~ population+illiteracy+income+frost)
+coeffs = (summary(lm)$coefficients)[,1]
+confint(lm,level=0.95)
+
+sigma = (summary(lm)$sigma)
+new_point = c(1,2,3,1,1.7)
+mu = new_point%*%coeffs
+x = seq(mu-4,mu+4,length=100)
+plot(x,dnorm(x,mu,sigma),col="BLUE",type="l") ##plug in
+
+k = stepAIC(lm,direction="backward")
+k
+
+```
+
+```{r}
+vec = c()
+for (i in 1:200){
+  sample = rnorm(300,2,1)
+  vec = append(vec,max(sample))
+}
+
+pdf <- function(y,theta){
+  300*pnorm(y-theta)^299*dnorm(y-theta)
+}
+
+log_likeli <- function(theta){
+  sum(sapply(vec,function(x) log(pdf(x,theta))))
+}
+
+theta = seq(-2,6,length=100)
+plot(theta,sapply(theta,log_likeli),type="l")
+ML = optim(4,function(theta)-log_likeli(theta),method="BFGS")$par
+ML
+```
+
+```{r}
+c = 3.04
+favorable = 0
+for (i in 1:10000){
+  x = rpois(1,2*c)
+  CI = 1/c*(x+c(-1,1)*1.96*sqrt(x))
+  if (2 >= CI[1] && 2 <= CI[2])
+    favorable = favorable+1
+}
+favorable/10000
+```
+
+```{r}
+n=100
+x=2
+fun <- function(y){
+  exp(y)/(1+exp(y))
+}
+fun(log(x/(n-x))+c(-1,1)*1.96*sqrt(n/(x*(n-x))))
+
+```
+
+```{r}
+x1=6
+n1=108
+x2=3
+n2=103
+
+2*log( ( (x1/n1)^x1*(1-x1/n1)^(n1-x1)*(x2/n2)^x2*(1-x2/n2)^(n2-x2))/(((x1+x2)/(n1+n+2))^(x1+x2)*(1-(x1+x2)/(n1+n2))^(n1+n2-x1-x2))) ##about 0.83 and should be chi-2 with 1 df so accept, dvs kan fortfarande vara s?? att c=0 dvs ingen skillnad
+```
+
+```{r}
+X = rexp(10000,2)
+Y = rexp(10000,2)
+hist(pexp(Y,1/X),prob="TRUE",col="red")
+pdf = function(x,y){
+  x/(x+y)^2
+}
+cdf = function(x,y){
+  integrate(function(y)pdf(x,y),0,y)$value
+}
+
+vec = c()
+for(i in 1:length(X)){
+  vec = append(vec,cdf(X[i],Y[i]))
+}
+hist(vec,prob="true",col="blue")
+```
+
+```{r}
+lambda = rgamma(10000,2,2) ##slumpa fram riktiga grejjer, och ta F med din predictive distr!
+X = rexp(10000,lambda)
+Y = rexp(10000,lambda)
+pdf = function(x,y){ ##alpha=2,beta=2
+  3*(x+2)^3/(x+y+2)^4
+}
+cdf = function(x,y){
+  integrate(function(y)pdf(x,y),0,y)$value
+}
+vec = c()
+for(i in 1:length(X)){
+  vec = append(vec,cdf(X[i],Y[i]))
+}
+hist(vec,prob="TRUE",col="red")
+
+```
+
+```{r}
+data = c(225, 175, 198, 189, 189, 130, 162, 135, 119, 162)
+n = length(data)
+
+log_likeli <- function(x){
+  mu = x[1]
+  a = x[2]
+  n*log(a)-a*n*log(mu)+(a-1)*sum(log(data))-1/(mu^a)*sum(data^a)
+}
+opt = optim(c(180,2),function(x)-log_likeli(x),hessian=TRUE)
+observed_fisher=opt$hessian
+ML = opt$par
+se = sqrt(diag(solve(observed_fisher)))
+max = -opt$val
+wald_mu = ML[1]+c(-1,1)*1.96*se[1]
+wald_a = ML[2]+c(-1,1)*1.96*se[2]
+
+
+mu = seq(100,300,length=300)
+a = seq(0.01,20,length=300)
+grid = expand.grid(mu,a)
+z = apply(grid,1,function(x)log_likeli(x)-max)
+z = array(z,c(300,300))
+contour(mu,a,z,levels=0:-10,xlab="mu",ylab="a")
+.filled.contour(mu,a,z,levels=c(-qchisq(0.95,2)/2,0),col=rgb(1, 0, 0, 0.3))
+rect(xleft=wald_mu[1],xright=wald_mu[2],ybottom=wald_a[1],ytop=wald_a[2],col = rgb(0.7, 0.7, 0.7, 0.4))
+points(ML[1],ML[2],pch=19,col="black")
+
+profile_log_likeli <- function(a){
+  opt = optim(150,function(mu)-log_likeli(c(mu,a)),method="Brent",lower=0,upper=1000)$par
+}
+lines(sapply(a,profile_log_likeli),a,col="green",type="l")
+lp <- function(a){
+  n*log(a)-n*log(sum(data^a)/n)+(a-1)*sum(log(data))-n
+}
+plot(a,sapply(a,lp),type="l",col="blue")
+
+```
+
+```{r}
+a = 8.78
+b = 8.78
+x = 41
+c = 23.3
+
+lambda = seq(0.1,10,length=200)
+plot(lambda,dgamma(lambda,a,b),col="blue",type="l",ylim=c(0,2))
+lines(lambda,dgamma(lambda,a+x,b+c),col="green",type="l")
+
+lambda = 0:10
+lines(lambda,dpois(x,c*lambda)*40,type="l",col="red")
+legend("topright",legend=c("prior","posterior","likelihood"),col=c("blue","green","red"),lty = rep(1,3),cex=1.0,bty="n")
+## ser att det ??r en kombination av prior och likelihood som ger posterior
+
+posterior <- function(l){
+  dgamma(l,a+x,b+c)
+}
+
+mode = optim(1,function(l)-posterior(l),method="BFGS")$par
+mode
+mean = integrate(function(l) l*posterior(l),0,Inf)$val
+mean
+
+to_min <- function(m){
+  abs(integrate(function(l) posterior(l),0,m)$val - 0.5)
+}
+median = optim(1,to_min,method="BFGS")$par
+median
+
+to_min <- function(eps){
+  
+  abs(integrate(function(l) posterior(l),mode-eps,mode+eps)$val - 0.95)
+}
+eps = optim(0.1,to_min,method="Brent",lower=0,upper=1)$par
+ci = c(mode-eps,mode+eps)
+ci
+abline(v=ci[1],col="purple")
+abline(v=ci[2],col="purple")
+```
+

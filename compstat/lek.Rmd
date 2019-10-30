@@ -1,0 +1,1000 @@
+---
+title: "lek"
+output: pdf_document
+---
+
+```{r}
+library(MASS)
+data(Boston) #l??ser in data frame Boston
+attach(Boston) #l??ser in s?? f??r ocks?? inneh??llet
+#f??r att extracta en kolonn gl??m ej citationstecken!
+
+fit = lm(medv ~ lstat)
+plot(lstat,medv,col="red")
+abline(fit)
+df = data.frame(lstat=20)
+confint(fit,level=0.95)
+predict(fit,df,level=0.95,interval='confidence')
+
+plot(fit)
+
+```
+
+```{r}
+library(MASS)
+data(Boston) #l??ser in data frame Boston
+attach(Boston)
+
+Boston$iter = Boston$age*Boston$lstat #can maybe also use cbind somehow
+fit = lm(medv ~lstat+age+iter,data=Boston)
+
+fit1 = lm(medv ~ lstat)
+fit2 = lm(medv ~ poly(lstat,degree=2)) #uncorrelated columns ortogonal polys om tar h??gre deg poly s?? samma coeff!
+summary(fit2) #higher adj r2 and coeff in front of x^2 significant
+
+plot(lstat,medv,col="red")
+lines(lstat,fitted.values(fit2),type="p",col="black")
+anova(fit1,fit2) #testar om de ??r lika, nej! fit2 mycker b??ttre detta ??r samma som kolla beta_2 ??r 0 eller ej!!
+
+fit3 = lm(medv ~ poly(lstat,degree=3))
+
+```
+
+```{r}
+library(MASS)
+library(leaps)
+data(Boston) #l??ser in data frame Boston
+attach(Boston)
+
+n = dim(Boston)[1]
+k = 10
+
+reg.fit = regsubsets(medv ~., data=Boston,nvmax=13)
+bic = summary(reg.fit)$bic
+ind = which(bic == min(bic))
+coefs = coef(reg.fit,ind)
+
+##vi vill nu v??lja genom att g??ra CV
+
+errors = rep(0,13)
+folds = cut(1:n,labels=FALSE,breaks=k)
+for (i in 1:k){ #denna ska vara test
+  inds = which(folds == i)
+  ytest = Boston[inds,'medv']
+  xtest = model.matrix(medv ~., data = Boston[inds,]) #includes intercept!
+  train = Boston[-inds,]
+  regfit = regsubsets(medv~., data=train,nvmax=13) ## GL??M EJ KOLLA MER EXAKT P?? PLOTS I DENNA S?? KAN L??SA AV! VIKTIGT!!
+  for(j in 1:13){
+    coefs = coef(regfit,j)
+    pred = xtest[,names(coefs)]%*%coefs
+    errors[j] = errors[j] + sum((ytest-pred)^2)
+  }
+}
+errors = errors/n
+ind = which(errors == min(errors))
+
+```
+
+```{r}
+## Vi har dessa 13 features men som mest k (kanske 5) som har effekt p?? respons. G??r Lasso/ride/elastic net f??r att f??nga detta.
+## kan ocks?? se som att minskar variansen f??r skattningarna och d??rmed test error!
+library(MASS)
+library(glmnet)
+data(Boston) #l??ser in data frame Boston
+attach(Boston)
+
+x = model.matrix(medv ~.,data=Boston)[,-1]
+y = Boston[,'medv']
+grid = 10^seq(2,-2,length=100)
+
+lasso = glmnet(x,y,lambda=grid,alpha=1) #here inputs should be matrices and not data frames!!
+coeffs = coef(lasso)
+coeffs[,89]
+
+lasso.min = cv.glmnet(x,y,alpha=1)$lambda.min
+ridge.min = cv.glmnet(x,y,alpha=0)$lambda.min
+coefs = coef(glmnet(x,y,alpha=1,lambda=lasso.min))
+
+
+```
+
+
+```{r}
+library(ISLR)
+data(Carseats)
+attach(Carseats)
+
+ShelveLoc = Carseats$ShelveLoc
+plot(Advertising,Sales,col=ShelveLoc)
+legend("topright",c('Bad','Good','Medium'),col = c(1,2,3), pch=15) #glöm ej pch. vilken symbol
+fit = lm(Sales ~ Advertising+ShelveLoc)
+abline(a = coef(fit)[1], b = coef(fit)[2],col= 1)
+abline(a = coef(fit)[1]+coef(fit)[3], b = coef(fit)[2], col = 2)
+abline(a = coef(fit)[1]+coef(fit)[4], b = coef(fit)[2], col=3)
+
+medium = (ShelveLoc == "Medium")*1
+good = (ShelveLoc == "Good")*1
+
+fit2 = lm(Sales~Advertising+medium+good)
+
+#y = b0+b1*adv + b2*medium+b3*good
+# b2 means medium-bad its p-value small so b2 sign and difference between medium and good!
+
+fitadv = lm(Sales ~ Advertising)
+anova(fitadv,fit2) # do we get a much better model if we include shelveloc? YES!
+
+bad = (ShelveLoc == "Bad")*1
+not_bad = (ShelveLoc == "Medium")*1+(ShelveLoc == "Good")*1
+
+fit3 = lm(Sales ~ 0+Advertising+bad+not_bad) #dont include intercept when have all levels in model
+anova(fit3,fit) #Big difference between these models in RSS so include good, medium, bad
+
+confint(fit,level=0.95) #duality test and CI reject. All are significant!!
+df = data.frame(Advertising= 15, medium = 0, good=1)
+predict(fit2, df, interval = "confidence")
+
+```
+
+```{r}
+set.seed(1)
+x1=runif(100)
+x2=0.5*x1+rnorm(100)/10
+y=2+2*x1+0.3*x2+rnorm(100)
+
+plot(x1,x2,col="blue",type="p")
+fit = lm(y~x1+x2) #cant say x2 sign
+corr = corr(cbind(x1,x2))
+#correlated so interpretation of coeffs is hard (or not clear)
+# se(bhat) large so hard to reject H0, i.e that the coeffs are sign
+# can barely reject H0 here individually but ANOVA gives some is not 0 easily
+
+fit2 = lm(y~x2) #now very clear that x2 is significant!!
+
+```
+
+```{r}
+##simulation
+
+#H0: sample 500 cards from all 700 uniformly
+#HA: 2/3 without replcacement and then 1/3 with replacement (do something to get less dupli)
+# we observe dupl = 90. p-val? can we reject H0? what is the power of the test?
+set.seed(1)
+duplicates_H0 <- function(){
+  sample = sample(1:700,500,replace=TRUE)
+  return(length(sample)-length(unique(sample)))
+}
+duplicates_HA <- function(){
+  sample = sample(1:700,500*2/3,replace=FALSE)
+  sample = append(sample,sample(1:700,500*1/3,replace=TRUE))
+  return(length(sample)-length(unique(sample)))
+}
+duplis_H0 = c() 
+duplis_HA = c()
+for(i in 1:2000){
+  duplis_H0 = append(duplis_H0, duplicates_H0()) ##bättre att köra replicate här!!
+  duplis_HA = append(duplis_HA,duplicates_HA())
+}
+par(mfrow = c(1,2))
+hist(duplis_H0,col="blue",prob=TRUE)
+hist(duplis_HA,col="red",prob=TRUE)
+
+critical = quantile(duplis_H0,0.05)
+pval = (sum(duplis_H0 <= 90)+1)/(2000+1) #so reject H0 in favor of HA, accept HA!
+#What is the power of this test?
+
+power = (sum(duplis_HA <= 90)+1)/(2000+1)
+```
+
+```{r}
+library(tree)
+library(randomForest)
+set.seed(1)
+
+data(Carseats)
+attach(Carseats)
+inds = sample(1:nrow(Carseats),200,replace=FALSE)
+train = Carseats[inds,]
+test = Carseats[-inds,]
+tree = tree(Sales ~., data=train) #builds a full tree
+
+plot(tree)
+text(tree,pretty=0) #yes means go left and no means go right
+pred = predict(tree,test[,-1])
+MSE = mean((test[,1]-pred)^2)
+
+cv = cv.tree(tree)
+dev = cv$dev
+k = cv$k
+k[1] = 0
+plot(k,dev,col="red",type="p") 
+ind = which(dev == min(dev))[1]
+
+pruned.tree = prune.tree(tree,k[ind])
+plot(pruned.tree)
+text(pruned.tree,pretty=0)
+
+pred2 = predict(pruned.tree,test[,-1])
+MSE2 = mean((test[,1]-pred2)^2) ## so actually get higher test error now!
+
+bag.tree = randomForest(Sales ~., mtry = 10, importance = TRUE, data = train)
+pred3 = predict(bag.tree,test[,-1])
+MSE3 = mean((test[,1]-pred3)^2)
+importance(bag.tree)
+varImpPlot(bag.tree)
+```
+
+```{r}
+# for replication
+set.seed(1)
+n <- 30
+p <- 50
+# relevant covariate
+x_true <- sample(c(0:1),size = n,replace = T)
+# noise covariates
+x <- matrix(sample(c(0:1),size=n*p,replace = T),ncol=p,nrow=n)
+# combination of the two
+x <- cbind(x_true, x)
+# response
+y <- ifelse(x[,1]==0, 0, sample(c(0:1), size = n, replace = T))
+
+## vill kolla om n??gon av kolonnerna ??r beroende av y. 
+## H0: oberoence och HA: beroende. Vi har inte global null men n??stan, bara f??rsta kolonnen beroende av y.
+
+p_vals = rep(0,p+1)
+for(i in 1:length(p_vals)){
+  table = table(x[,i],y)
+  p_val = chisq.test(table)$p.value
+  p_vals[i] = p_val
+}
+print(sum(p_vals <= 0.05)) #f??rkastar h??r 2, det ??r en f??r mycket!
+## m = 51, m0 = 1, reject if p_val <= alpha/5 = 0.05/51 Bonferroni correction
+print(sum(p_vals <= 0.05/51)) # now won't reject anyone!
+
+#The westfall young permutation procedure holds only under
+# global null which we almost have. So lets do it
+
+X = rep(100)
+for(i in 1:400){
+  p_vals = rep(0,p+1)
+  y = sample(y,length(y),replace=FALSE)
+  for(j in 1:length(p_vals)){
+    table = table(x[,j],y)
+    p_val = chisq.test(table,simulate.p.value = TRUE)$p.value
+    p_vals[j] = p_val
+  }
+  X[i] = min(p_vals)
+}
+delta = quantile(X, p = 0.05)
+sum(p_vals <= delta)
+
+```
+
+```{r}
+library(ISLR)
+data(Hitters)
+attach(Hitters)
+library(leaps)
+
+Hitters = na.omit(Hitters)
+reg.fit = regsubsets(Salary~., data = Hitters, nvmax = 19, method = "forward")
+bic = summary(reg.fit)$bic
+ind = which(bic == min(bic))
+coefs = coef(reg.fit, ind)
+
+plot(reg.fit,scale="bic") ##svart ??r med, vit ??r inte med
+plot(bic,xlab="ind",ylab="bic",type="l")
+
+## want low BIC,AIC and CP and high adjR2
+```
+
+```{r}
+library(hdi)
+library(glmnet)
+data(riboflavin)
+x = riboflavin$x
+y = riboflavin$y
+
+grid = 10^seq(2,-2,length = 100)
+
+lasso = glmnet(x,y,alpha = 1, lambda = grid) ## don't need intercept
+coefs = coef(lasso)
+test_lambda = coefs[,50]
+
+folds = cut(1:71, breaks = 7, labels = FALSE)
+errors = rep(0,2)
+for(i in 1:7){
+  
+  inds = which(folds == i)
+  xtest = x[inds,]
+  ytest = y[inds]
+  xtrain = x[-inds,]
+  ytrain = y[-inds]
+  
+  lambda_min_lasso = cv.glmnet(xtrain,ytrain, alpha = 1)$lambda.min
+  lasso.mod = glmnet(xtrain,ytrain,lambda = lambda_min_lasso, alpha = 1)
+  pred_lasso = predict(lasso.mod,xtest)
+  errors[1] = errors[1] + sum((pred_lasso-ytest)^2)
+  
+  lambda_min_ridge = cv.glmnet(xtrain,ytrain, alpha = 0)$lambda.min
+  ridge.mod = glmnet(xtrain,ytrain,lambda = lambda_min_ridge, alpha = 0)
+  pred_ridge = predict(ridge.mod, xtest)
+  errors[2] = errors[2] + sum((pred_ridge-ytest)^2)
+}
+
+errors = errors/71 ##0.260, and 0.325 so lasso procedure lower test errors
+
+lambda_min = cv.glmnet(x,y, alpha = 1)$lambda.min
+lasso.mod = coef(glmnet(x, y, lambda = lambda_min, alpha = 0))
+
+```
+
+```{r}
+library(kknn)
+n = 500
+set.seed(0)
+
+g1<-function(x){2*x/(1+abs(x)^1.5)} 
+g2<-function(x){x^3/abs(x)^1.5} 
+g3<-function(x){x}
+
+Z = matrix(runif(500*2,-1,1),ncol=2)
+X1 = g1(Z)
+X2 = g2(Z)
+X3 = g3(Z)
+
+par(mfrow = c(1,3))
+plot(X1)
+plot(X2)
+plot(X3)
+
+sampleX <- function(n = 500){
+  Z = matrix(runif(n*2,-1,1),ncol=2)
+  X = g1(Z)
+}
+f1dim <- function(x1){ sin(8*x1)/(1+(4*x1)^2) }
+
+f <- function(X){
+  apply(X, 1, function(x) f1dim(x[1])) ##apply f??r matris och sapply vektor
+}
+
+sampleY <- function(X){
+  f(X)+rnorm(nrow(X),0,0.3)
+}
+
+true_test_error = 0
+for(i in 1:1000){
+  
+  Xtrain = sampleX(n = 500)
+  Ytrain = sampleY(Xtrain)
+  Xtest = sampleX(n = 2000)
+  Ytest = sampleY(Xtest)
+  dfTrain = data.frame(y = Ytrain, x = Xtrain)
+  dfTest = data.frame(y = Ytest, x = Xtest)
+  fit.kknn = kknn(y ~., dfTrain, dfTest, k=8)
+  pred = predict(fit.kknn)
+  true_test_error = true_test_error + sum((pred-Ytest)^2)
+}
+true_test_error = true_test_error/(2000*1000) #0.112, dvs f??r data 500 tr??nar s?? ??r test error 0.112 om tr??nar p?? mer s?? l??gre
+
+# below we estimate the true test error
+ValidationSet <- function(X,Y){ #0.0.117 slightly larger which we expect
+  inds = sample(1:length(Y), length(Y), replace=FALSE) ##SHUFFLE
+  Y = Y[inds]
+  X = X[inds,]
+  folds = cut(1:length(Y), breaks = 2, labels = FALSE) # validation set approach != 2 fold CV
+  
+  inds = which(folds == 1)
+  Xtrain = X[inds,]
+  Ytrain = Y[inds]
+  Xtest = X[-inds,]
+  Ytest = Y[-inds]
+  dfTrain = data.frame(y = Ytrain, x = Xtrain)
+  dfTest = data.frame(y = Ytest, x = Xtest)
+  fit.kknn = kknn(y~., dfTrain, dfTest, k = 8)
+  pred = predict(fit.kknn)
+  return(mean((pred-Ytest)^2))
+}
+
+RepeatedValidationSet <- function(X,Y){ #0.115
+  estimates = replicate(10, ValidationSet(X,Y)) #g??r om experimentet 10 ggr
+  mean(estimates)
+}
+
+CV <- function(X,Y){ ##0.169
+  error = 0
+  folds = cut(1:length(Y), breaks = 10, labels = FALSE)
+  for(i in 1:10){
+    inds = which(folds == i)
+    Xtrain = X[-inds,]
+    Ytrain = Y[-inds]
+    Xtest = X[inds,]
+    Ytest = Y[inds]
+    dfTrain = data.frame(y = Ytrain, x = Xtrain)
+    dfTest = data.frame(y = Ytest, x = Xtest)
+    fit.kknn = kknn(y~., dfTrain, dfTest, k = 8)
+    pred = predict(fit.kknn)
+    error = error + sum((pred-Ytest)^2)
+  }
+  return(error/500)
+}
+
+#I LOOCV beh??ver ej h??lla p?? med folds och s??. G??r om Xtest till en matris f??r att det ska funka!!!
+LOOCV <- function(X,Y){ #0.111 which is best so far so LOOCV best
+  error = 0
+  for(i in 1:500){
+    Xtrain = X[-i,]
+    Ytrain = Y[-i]
+    Xtest = matrix(X[i,],ncol=2)
+    Ytest = Y[i]
+    dfTrain = data.frame(y = Ytrain, x = Xtrain)
+    dfTest = data.frame(y = Ytest, x = Xtest)
+    fit.kknn = kknn(y~., dfTrain, dfTest, k = 8)
+    pred = predict(fit.kknn)
+    error = error + sum((pred-Ytest)^2)
+  }
+  return(error/500)
+}
+
+EvaluateOnSimulation <- function(fun, iterations = 100){
+  vals = rep(0,iterations)
+  for(i in 1:iterations){
+    X = sampleX()
+    Y = sampleY(X)
+    est = fun(X,Y)
+    vals[i] = est
+  }
+  return(vals)
+}
+
+ValidationSetEstimates = EvaluateOnSimulation(ValidationSet)
+RepeatedValidationSetEstimates = EvaluateOnSimulation(RepeatedValidationSet) #har l??gre varians eftersom medelv??rde!
+CVEstimates = EvaluateOnSimulation(CV)
+LOOCVEstimates = EvaluateOnSimulation(LOOCV)
+
+boxplot(ValidationSetEstimates,RepeatedValidationSetEstimates,CVEstimates,LOOCVEstimates,col = c("red","blue","green","purple"))
+abline(h=true_test_error)
+
+#what is bias and variance of the LOOCV est?
+var = var(LOOCVEstimates)
+bias = mean(LOOCVEstimates)-true_test_error
+
+```
+
+```{r}
+# E[(f^(x_i)-y_i)^2] =sigma^2+bias^2+var d??r x fixerad och y random
+f <- function(x){ .3* x - 0.2*x^2 + 0.1*x^3 + sin(2*x) } #y_i = f(x_i)+eps_i
+span <- c(0.1,0.2,0.3,0.45,0.7,1) # smoothing parameter for loess:
+sigma <- 1.5 # standard devation of noise
+n <- 100 # sample size
+x <- seq(from=-5,to=5, length=n) # x-values (fixed throughout simulation)
+xtest<-2
+
+par(mfrow = c(2,3))
+estimates = matrix(numeric(6*25),ncol=6)
+for(i in 1:6){ ## variance decreases with higher alpha
+  plot(x,f(x),type="l",lwd="2", main=paste("alpha = ",span[i])) #main ??r titel och paste concatenatar tv?? str??ngar
+  for(j in 1:25){
+    y = f(x)+rnorm(n,0,sigma)
+    fit = loess(y~x, span = span[i]) #perform local regression
+    lines(x,predict(fit,x),col="red")
+    estimates[j,i] = predict(fit,xtest)
+  }
+  abline(v = xtest)
+}
+
+par(mfrow = c(2,3))
+for(i in 1:6){
+  hist(estimates[,i],prob=TRUE, main = paste("alpha, ", span[i]))
+  abline(v = f(xtest), lwd=2 )
+}
+# higher alpha lower variance higher bias and lower alpha higher variance lower bias. This is the bias variance tradeoff!
+# high bias and variance are bad. So how should we choose alpha then??
+
+# what is true test error for different alphas?
+
+test_errors = rep(0,6)
+for(i in 1:6){ 
+  for(j in 1:1000){
+    y = f(x)+rnorm(n,0,sigma)
+    ytest = f(xtest)+rnorm(1,0,sigma)
+    fit = loess(y~x, span = span[i]) #perform local regression
+    test_errors[i] = test_errors[i]+(predict(fit,xtest)-ytest)^2
+  }
+}
+test_errors = test_errors/1000 ##looks like alpha = 0.3 lower test error at this point
+# 2.79 h??r f??r alpha = 0.1
+```
+
+```{r}
+f <- function(x){ .3* x - 0.2*x^2 + 0.1*x^3 + sin(2*x) } #y_i = f(x_i)+eps_i
+alpha = 0.1 #b??st att anv??nda bagging p?? den flexibla modellen med h??g varians
+x = seq(-5,5, length=100)
+xtest = 2
+
+error = 0
+for(k in 1:300){
+  y = f(x)+rnorm(100,0,1.5)
+  ytest = f(xtest)+rnorm(1,0,1.5)
+  pred = 0
+  for (i in 1:10){
+    inds = sample(1:100,100,replace=TRUE)
+    xdata = x[inds]
+    ydata = y[inds]
+    fit = loess(ydata ~ xdata, span = alpha)
+    pred = pred + predict(fit,xtest)
+  }
+  pred = pred/10
+  error = error+(pred-ytest)^2
+}
+
+error = error/300 #2.85
+
+```
+
+
+```{r}
+set.seed(0)
+n<-100
+z1<-rnorm(n)
+z2<-rnorm(n)
+M=matrix(c(1,1,0.1,-0.1),2,2)
+X=t(M%*%rbind(z1,z2))
+
+beta<-c(0.5,-1.0)
+x1=X[,1]
+x2=X[,2]
+y=5+beta[1]*x1+beta[2]*x2 +rnorm(n)
+X = cbind(1,X) # glöm ej lägga till kolonn för intercept!
+
+plot(x1,x2,type="p",col="red",main="training data") ##highly correlated...
+fit = lm(y~x1+x2) #can't say any are significant individually because of correlated but ANOVA says atleast some not 0
+## can see they have high standard error also because of correlated
+
+##what is p-value for bhat_1?
+XtX.inv = solve(t(X)%*%X)
+bhat = XtX.inv%*%t(X)%*%y
+RSS = sum((y-X%*%bhat)^2)
+sigma = sqrt(1/97*RSS)
+se = sqrt(sigma^2*XtX.inv) ##detta matris
+t_val = bhat[2]/se[2,2]
+p_val = 2*(1-pt(t_val,df=97)) # so don't reject!
+
+# the ANOVA F-test gives 0.003 so reject!
+fit2 = lm(y ~ 1)
+anova(fit,fit2)
+r2 = 1-RSS/sum((y-mean(y))^2) ##TSS = sum (y_i-ybar)^2
+
+fit3 = lm(y~x1) #so now it is significant!
+```
+
+```{r}
+## simple linear regression
+set.seed(21) # initializes the random number generator
+x <- rnorm(40, 20, 3) # generates x-values
+y <- 1 + 2 * x + 5 * rnorm(length(x)) # y-values = linear function(x) + error
+reg <- lm(y ~ x) # fit of the linear regression
+summary(reg) # output of selected results
+plot(x, y) # scatter plot
+
+abline(reg) # draw regression line
+plot(reg, which = 1)
+
+```
+
+```{r}
+set.seed(21) # initializes the random number generator
+x <- rnorm(40, 20, 3) # generates x-values
+X = cbind(1,x) # need 1 first column design matrix!
+
+par(mfrow = c(3,2))
+slopes = numeric(100)
+for(i in 1:100){
+  y <- 1 + 2*x + rnorm(length(x),0,5) # y-values = linear function(x) + error
+  fit = lm(y~x)
+  if(i <=3){
+    plot(x,y,col="red",type="p")
+    abline(fit)
+    plot(fit, which = 1)
+  }
+  slopes[i] = coef(fit)[2]
+}
+mean = mean(slopes)
+sd = sqrt(var(slopes))
+hist(slopes,prob=TRUE,col="red",breaks=10) # ??r den normal med det vi tror?
+true_sd = 5*sqrt(solve(t(X)%*%X)[2,2])
+
+vals = seq(1.4,2.6,length=100)
+lines(vals,dnorm(vals,2,true_sd)) ##seems good!
+
+
+```
+
+```{r}
+
+D = c(4,8,3,-4,-1,2,5)
+iter = 100000
+D.sign.rank = rank(abs(D))*sign(D)
+W = sum(D.sign.rank[D.sign.rank >= 0])
+Ws = numeric(iter)
+for(i in 1:iter){
+  multi = sample(c(-1,1),length(D),replace=TRUE)
+  new_D = D*multi
+  sign.rank = rank(abs(new_D))*sign(new_D)
+  Ws[i] = sum(sign.rank[sign.rank >= 0])
+}
+p_val = (sum(Ws >= W)+1)/(100001) #don't forget this one!
+abs(p_val-wilcox.test(D,alternative="greater")$p.value)
+```
+
+```{r}
+d = c(0.5,1)
+p_val = wilcox.test(d,alternative="greater")$p.value
+```
+
+```{r}
+require(MASS)
+data(immer)
+set.seed(852)
+Y1 = immer$Y1
+Y2 = immer$Y2
+D = Y1-Y2
+D = D[ D != 0] #remove ties!
+plot(Y1,Y2)
+abline(a=0,b=1)
+M = 1000000
+#H0 : D symmetric around 0,
+#HA : D symmetric around a, a > 0
+
+D.sign.rank = rank(abs(D))*sign(D)
+W = sum(D.sign.rank[D.sign.rank >= 0])
+Ws = numeric(M)
+for(i in 1:M){
+  signs = sample(c(-1,1),length(D),replace=TRUE)
+  new_D = D*signs
+  sign.rank = rank(abs(new_D))*sign(new_D)
+  Ws[i] = sum(sign.rank[sign.rank >= 0])
+
+}
+hist(Ws ,prob="TRUE",col="blue")
+abline(v = W, lwd="2") 
+p_val = (sum(Ws >= W)+1)/(M+1) #0.0027
+
+p_val_wilcox = wilcox.test(D,alternative="greater")$p.value
+```
+
+
+```{r}
+x = rnorm(1000,0,1)
+y = x/2+rnorm(1000,5,5)
+M = 100000
+#H0: x and y independent
+#HA : x and y dependent
+cor = cor(x,y)
+cors = numeric(M)
+for(i in 1:M){
+  new_y = sample(y,length(y),replace=FALSE)
+  cors[i] = cor(x,new_y)
+}
+hist(cors,col="red",prob="TRUE")
+abline(v=cor, lwd = 2)
+p_val = (sum(abs(cors) >= cor)+1)/(M+1) #0.01 so reject!
+
+```
+
+```{r}
+group1 = rexp(100, 1)
+group2 = rexp(100, 0.58)
+X = c(group1,group2)
+Y = c(rep(0,100),rep(1,100))
+
+#H0 : F_X = F_Y
+#HA : F_Y = F_X(x-a), a  > 0
+
+W = sum(rank(X)[ Y == 1 ])
+M = 100000
+Ws = numeric(M)
+
+for(i in 1:M){
+  new_Y = sample(Y,length(Y),replace=FALSE)
+  Ws[i] = sum(rank(X)[ new_Y == 1 ])
+}
+p_val = (sum(Ws >= W)+1)/(M+1)
+
+```
+
+```{r}
+# DO ANOVA EXERCICE AND THEN POST MODEL INFERENCE!
+data = read.csv("data_ex3.csv")
+x = data$x
+y = data$y
+fit = lm(y~I(x)+I(x^2)+I(x^3)) #don't to poly here... changes coefficients!
+plot(x,fitted.values(fit),type="p",col="red")
+lines(x,y,type="p")
+fstatistic = summary(fit)$fstatistic # can calculate this. Under H0 F-distributed
+p_val = 1-pf(fstatistic[1],fstatistic[2],fstatistic[3]) #0.017 so reject H0
+
+n = 20
+x = seq(-25,30,length=n)
+b0 = 0 
+b1 = 0.5
+b2 = -0.003
+b3 = 0.0001
+crit = qf(0.95,3,16) #Under H0 är statistikan F_(3,16) och förkasta om p-val <= 0.05
+
+# 250 data sets type 1 error (0.05 sign level)
+count = 0
+for(i in 1:1000){ #what is type 1 error = P(reject | H0)
+  y = b0+15*(rgamma(n,2,1)-2)
+  fit2 = lm(y~I(x)+I(x^2)+I(x^3))
+  if(summary(fit2)$fstatistic[1] >= crit){
+    count = count+1
+  }
+}
+type1_error = count/1000
+
+count = 0
+for(i in 1:1000){ #what is power = P(reject | HA)
+  y = b0+b1*x+b2*x^2+b3*x^3+15*(rgamma(n,2,1)-2)
+  fit2 = lm(y~I(x)+I(x^2)+I(x^3))
+  if(summary(fit2)$fstatistic[1] >= crit){
+    count = count+1
+  }
+}
+power = count/1000
+
+```
+
+
+```{r}
+#we now perform our own ANOVA
+data = read.csv("data_ex3.csv")
+set.seed(82)
+x = data$x
+y = data$y
+fit = lm(y~I(x)+I(x^2)+I(x^3))
+statistic = summary(fit)$fstatistic[1]
+M = 1000
+
+statistics = numeric(M)
+for(i in 1:M){
+  new_y = sample(y,length(y),replace=FALSE)
+  fit2 = lm(new_y ~ I(x)+I(x^2)+I(x^3))
+  statistics[i] = summary(fit2)$fstatistic[1]
+}
+p_val = (sum(statistics >= statistic)+1)/(M+1) #0.025
+```
+
+```{r}
+#what is power of this test?
+b0 = 0 #
+b1 = 0.5
+b2 = -0.003
+b3 = 0.0001
+
+n = 20
+n.sim = 100
+x = seq(-25,30,length=n)
+count = 0
+for(i in 1:n.sim){
+  y = b0+b1*x+b2*x^2+b3*x^3+15*(rgamma(n,2,1)-2) # now we have data and see if reject H0
+  fit = lm(y~I(x)+I(x^2)+I(x^3))
+  statistic = summary(fit)$fstatistic[1]
+  M = 1000
+  for(i in 1:M){
+    new_y = sample(y,length(y),replace=FALSE)
+    fit2 = lm(new_y ~ I(x)+I(x^2)+I(x^3))
+    statistics[i] = summary(fit2)$fstatistic[1]
+  }
+  p_val = (sum(statistics >= statistic)+1)/(M+1)
+  if(p_val <= 0.05){
+    count = count+1
+  }
+}
+power = count/100
+```
+
+```{r}
+x1 = rnorm(50,0,10)
+x2 = rnorm(50,0,10)+x1/3
+M = 500
+count = 0
+for(j in 1:M){
+  y = 1+2*x1+1.6*x2 + runif(50,-2,2)
+  fit = lm(y~x1+x2)
+  bhat = coef(fit)[2]
+  
+  B = 100
+  bhats = rep(0,B)
+  for(i in 1:B){
+    inds = sample(1:100,100,replace=TRUE)
+    new_x1 = x1[inds]
+    new_x2 = x2[inds]
+    new_y = y[inds]
+    
+    fitBS = lm(new_y~new_x1+new_x2)
+    bhats[i] = coef(fitBS)[2]
+  }
+  ci = c(2*bhat-quantile(bhats,p=0.975),2*bhat-quantile(bhats,p=0.025))
+  if( ci[1] <= 2 & 2 <= ci[2]){
+    count = count+1
+  }
+}
+print(count/M) #not really good, want it to be 95% but ok!
+
+```
+```{r}
+# we may have bootstrap inconsistency at boundary of parameter space!!
+## eg X_1,...,X_n are normal(mu,1) where know mu >= 0
+## an ML estimator is max(x_bar,0). Dont have BS const at mu = 0 but have for mu > 0
+```
+
+
+```{r}
+library(MASS)
+library(boot)
+bogg <- c(17, 26, 12, 6, 12, 18, 10, 12, 26, 13, 13, 11, 12, 35, 7, 21, 44, 10, 21) #exp special case gamma
+hist(bogg, col="red",prob=TRUE)
+mle = fitdistr(bogg, "gamma")$estimate #fitdistr is for ML estimates
+
+log_likeli <- function(x){
+  shape = x[1]
+  rate = x[2]
+  sum(dgamma(bogg,shape=shape,rate=rate,log = TRUE))
+}
+
+opt = optim(c(1,1), function(x) -log_likeli(x))
+mle2 = opt$par
+x = seq(min(bogg),max(bogg),length = 100)
+lines(x,dgamma(x,mle2[1],mle2[2]),type="l") ##looks pretty ok!
+
+# since know family will do parametric BS to find theta which os 0.75 quantile!
+
+est = quantile(bogg, p=0.75)
+statistic <- function(data){
+  quantile(data, p = 0.75)
+}
+
+gen <- function(data, mle){
+  n = length(data)
+  rgamma(n, mle[1], mle[2])
+}
+
+boot.res = boot(bogg, statistic, ran.gen = gen, mle = mle, sim = "parametric", R = 1000)
+ci.param = boot.ci(boot.res, conf = 0.95, type = c("norm", "basic", "perc"))
+
+## next we do non-param BS and compare length of intervals!
+
+statistic <- function(data, inds){
+  d = data[inds]
+  quantile(d, p=0.75)
+}
+boot.res = boot(bogg, statistic, R = 1000)
+ci.nonparam = boot.ci(boot.res, conf = 0.95, type = c("norm", "basic", "perc"))
+## we see that param BS has smaller CI. So it is better when know which family sample is from
+```
+
+```{r}
+#682 olika kort, varje paket innehåller 5 kort.
+# H0 : packar likformigt med replacement
+# HA : med replacement men 100 av korten 5 ggr mer sannolika än de andra, dvs packar för att få mer duplicates
+# hur många paket ska vi göra testet med för att komma över 80% power?
+# power = P(reject | HA)
+set.seed(456)
+M = 100000
+npacks = seq(25,40,by = 5)
+powers = rep(0, length(npacks))
+
+duplicates_H0 <- function(npack){
+    sample = sample(1:682, npack*5, replace=TRUE)
+    5*npack-length(unique(sample))
+}
+
+duplicates_HA <- function(npack){
+  sample = sample(1:682, size = 5*npack, prob = c(rep(5/1082,100), rep(1/1082,582)), replace=TRUE)
+  5*npack-length(unique(sample))
+}
+
+for(i in 1:length(npacks)){
+  npack = npacks[i]
+  
+  dupli_H0 = replicate(M, duplicates_H0(npack))
+  duplis_HA = replicate(M, duplicates_HA(npack))
+  crit = quantile(dupli_H0, 0.95)+1
+  power[i] = (sum(duplis_HA >= crit)+1)/(M+1)
+}
+
+# 30 packs is enough to do the test with so power is at least 80
+# so now go buy 30 packets and if ## duplicates too large then reject H0. power of this test > 80%
+
+
+
+```
+
+
+```{r}
+# libraries needed
+# for GAMs
+library(gam)
+# for KNN regression
+library(FNN)
+# for repro
+set.seed(1)
+# predictors in training set
+xtrain <- matrix(rnorm(20*100),ncol=20, nrow = 100)
+# response in training set
+ytrain <- sin(2*xtrain[,1]) + 0.3*rnorm(100)
+# training set
+dtrain <- data.frame(xtrain,y = ytrain)
+# predictors in test set
+xtest <- matrix(rnorm(20*100),ncol=20, nrow = 100)
+# response in test set
+ytest <- sin(2*xtest[,1]) + 0.3*rnorm(100)
+# test set
+dtest <- data.frame(xtest, y = ytest)
+
+errors = c(0,12) ## test error: multiple, gam, knn
+
+mlr = lm(y~X1, data = dtrain)
+pred = predict(mlr,dtest)
+errors[1] = mean((ytest-pred)^2)
+#solved by backfitting!
+gam = gam(y ~ s(X1,4), data = dtrain) #smoothing spline 4 df. Natural cubic spline knot every point
+## look at gam = gam(y ~ X1+s(X2,4), data = dtrain) and plot(gam) which plots components
+pred = predict(gam,dtest)
+errors[2] = mean((ytest-pred)^2)
+
+for(i in 1:10){
+  knn.fit = knn.reg(train = matrix(xtrain[,1]), test = matrix(xtest[,1]), y = ytrain, k = i)
+  pred = knn.fit$pred
+  errors[i+2] = mean((ytest-pred)^2)
+}
+## now add more predictors (dimension increases) and see how test error increases
+```
+
+
+```{r}
+x = seq(-1, 1, length = 101)
+y  = x+4*cos(7*x)+rnorm(101,0, 1)
+
+par(mfrow = c(1,3))
+knots = c(quantile(x,0.25), quantile(x, 0.5), quantile(x, 0.75))
+fit1 = lm(y~ bs(x, knots = knots, degree = 3)) # cubic spline 3 knots. bs gives x,x^2, (x-eps_1)_+^3,(x-eps_2)_+^3,(x-eps_3)_+^3...... s ger smooth spline
+plot(x, y, type="p", main = "cubic spline 3 knots uniformly")
+lines(x, fitted.values(fit1), col="red")
+
+fit2 = gam(y ~ s(x, df = 4))
+plot(x, y, type="p", main = "smoothing spline",xlim = c(-2,2))
+lines(seq(-2,2,length=100), predict(fit2, data.frame(x=seq(-2,2,length=100)) ), col="red")
+
+fit3 = loess(y~ x, span = 0.5)
+plot(x, y, type="p", main = "local regression")
+lines(x, predict(fit3,x), col="red")
+
+
+```
+
+
+
+```{r}
+x = seq(-1,1, length = 400)
+y = x+rnorm(400,0,1)
+fit = lm(y ~ poly(x, degree=20))
+par(mfrow = c(1,2))
+plot(x, fitted.values(fit), type="p")
+plot(x,y,type="p") # for large polynomial degree seems to be very flexible near boundary!
+
+```
+
+```{r}
+library(multiplex)
+df = data.frame(x = rnorm(100,10,1), y = rnorm(100, 10, 1))
+write.dat(df, "/Users/andreas/Documents/workspace/R/compstat")
+```
+
+```{r}
+data = read.table("df.dat") #load should also work!!
+```
+
+
+
+

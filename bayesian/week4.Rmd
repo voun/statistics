@@ -1,0 +1,252 @@
+---
+output: pdf_document
+---
+
+```{r}
+##simulate from Beta(17, 13)
+N = 100000;
+
+sample = rep(0.5, N);
+for(i in 2:N){
+  prop = sample[i-1]+rnorm(1, 0, 0.2); ##symmetric
+  acc = min(1, dbeta(prop, 17, 13)/dbeta(sample[i-1], 17, 13))
+  if(runif(1, 0, 1) < acc)
+    sample[i] = prop
+  else
+    sample[i] = sample[i-1]
+}
+plot(sample, type="l", )
+hist(sample[-c(1:1000)], col="blue", prob=TRUE)
+x = seq(0, 1, length=1000)
+lines(x, dbeta(x, 17, 13))
+
+##now assume this is our prior for p
+## we get 12 new trials and want to predict >= 7 successes
+pred = mean(1-pbinom(6, 12, sample))
+
+sum(sample[-1] == sample[-N]) ##number of times reject
+```
+
+```{r}
+library(LearnBayes)
+library(coda)
+data(cars)
+N = 10000
+post <- function(theta){
+  prod(dnorm(cars[,2], theta[1]+theta[2]*cars[,1]+theta[3]*cars[,1]^2, theta[4]))
+}
+
+log_post <- function(theta){
+  sum(dnorm(cars[,2], theta[1]+theta[2]*cars[,1]+theta[3]*cars[,1]^2, theta[4], log=TRUE))
+}
+
+sample = matrix(numeric(N*4), ncol = 4)
+y = seq(15, 130, length = 200)
+pred = matrix(numeric(N*200), ncol = 200)
+sample[1,] = c(0, 2, 0, 5);
+theta = sample[1,]
+speed = 21
+pred[1,] = dnorm(y, theta[1]+theta[2]*speed+theta[3]*speed^2, theta[4])
+preds = numeric(N)
+for(i in 2:N){
+  prop = sample[i-1,] + rnorm(4, 0, c(0.2, 0.2, 0.01, 0.2))
+
+  acc = min(1, post(prop)/post(sample[i-1,]))
+  if(runif(1, 0, 1) < acc)
+    sample[i,] = prop
+  else
+    sample[i,] = sample[i-1,]
+  theta = sample[i,]
+  pred[i,] = dnorm(y, theta[1]+theta[2]*speed+theta[3]*speed^2, theta[4])
+  preds[i] = rnorm(1, theta[1]+theta[2]*speed+theta[3]*speed^2, theta[4])
+}
+
+pred = apply(pred, 2, mean)
+pred = pred/sum(pred)
+plot(y, pred, type="l")
+
+fit = lm(dist ~ poly(speed, degree = 2), data = cars)
+plot(cars[,1], fitted.values(fit), type="l")
+obs = data.frame(speed = 21)
+predict(fit, obs, interval = "confidence")
+quantile(preds, c(0.025, 0.975))
+
+par(mfrow = c(2,2))
+for(i in 1:4)
+  plot(sample[,i], type="l") #can use these traceplots to see how much to remove for burn in
+sample = sample[-(1:1000),]
+
+acf(sample[,3]) ##the blue lines is the complement of the rejection region under the 
+                ## null that they are independent.
+ccf(sample[,3], sample[,4])
+
+## if want a true sample then need to use thinning and take, e.g every 200:th sample point
+result = sample[(1:45)*200,]
+acf(result[,3]) ## now not as correlated
+
+lap.approx = laplace(log_post, c(-17, 4, 0, 15))
+start = lap.approx$mode
+steps = sqrt(diag(lap.approx$var))/10
+
+
+
+
+
+
+```
+
+```{r}
+data = c(1, 1.4, 1.9, 0.3, 1.5, 1.7) 
+# and then there are two observations censored by 2. 
+N = 100000
+
+matrix = matrix(c(0, 3 ,3 ), nrow=N, ncol=3, byrow=TRUE)
+for(i in 2:N){
+  res = rnorm(1, matrix[i-1,1], 1)
+  while(res < 2)
+    res = rnorm(1, matrix[i-1,1], 1)
+  matrix[i,2] = res
+  
+  res = rnorm(1, matrix[i-1,1], 1)
+  while(res < 2)
+    res = rnorm(1, matrix[i-1,1], 1)
+  matrix[i,3] = res
+  
+  aug.data = c(data, matrix[i,2], matrix[i,3])
+  matrix[i,1] = rnorm(1, mean(aug.data), sd(aug.data)/sqrt(8))
+    
+}
+
+hist(matrix[,1], prob=TRUE, col="blue")
+```
+
+```{r}
+library(LearnBayes)
+n = 5
+y = 5
+mu = 0
+s2 = 0.25
+log_post <- function(theta) {y*theta-n*log(1+exp(theta))-(theta-mu)^2/(2*s2)}
+post <- function(theta) exp(log_post(theta)) #known up to constant is ok in rejection sampling
+
+laplace.approx = laplace(log_post, c(0))
+mu.app = laplace.approx$mode
+var.app = laplace.approx$var
+# Now want to calc. prob coin is biased toward  heads (theta pos)
+
+P = 1-pnorm(0, mu.app, sqrt(var.app))
+M = -optim(0, function(x) -post(x)/dnorm(x, 0, sqrt(s2)), lower = -5, upper = 5, method="Brent")$value
+#note need M > 1
+
+sample = numeric(10000)
+for(i in 1:10000){
+  Y = rnorm(1, 0, sqrt(s2))
+  U = runif(1, 0, 1)
+  while(U > 1/M * post(Y)/dnorm(Y, 0, sqrt(s2))){
+    Y = rnorm(1, 0, sqrt(s2))
+    U = runif(1, 0, 1)
+  }
+  sample[i] = Y
+}
+
+P.rej = sum(sample > 0)/length(sample)
+
+#dont know why SIR works when not normalized but it does!!
+prop.sample = rnorm(10000, 0, sqrt(s2)) #now want to use SIR
+weights = post(prop.sample)/dnorm(prop.sample, 0, sqrt(s2))
+probs = weights/sum(weights) ##nomalize
+sample = sample(sample, 10000, replace=TRUE, prob = probs)
+
+P.sir = sum(sample > 0)/length(sample)
+
+sample = rep(0,10000)
+sample[1] = mu.app
+for(i in 2:10000){
+  prop = sample[i-1] + rnorm(1, 0, 2*sqrt(var.app))
+  acc = min(1, post(prop)/post(sample[i-1]))
+  if(runif(1) < acc)
+    sample[i] = prop
+  else
+    sample[i] = sample[i-1]
+}
+
+P.mh = sum(sample > 0)/length(sample)
+
+
+```
+```{r}
+library(LearnBayes)
+months = 1:18
+y = c(15, 11, 14, 17, 5, 11, 10, 4, 8 ,10,7,9,11,3,6,1,1,4)
+log_post <- function(b){
+  b0 = b[1]
+  b1 = b[2]
+  sum(y*(b0+b1*months)-exp(b0+b1*months))
+}
+post <- function(b) exp(log_post(b))
+
+laplace.approx = laplace(log_post, c(5,-1))
+mean = laplace.approx$mode
+var = laplace.approx$var
+sd = sqrt(diag(var))
+##use this in the sir algorithm to sample from post!!
+sample.prop = matrix(numeric(2*10000), ncol=2)
+sample.prop[,1] = rnorm(10000, mean[1], sd[1])
+sample.prop[,2] = rnorm(10000, mean[2], sd[2])
+
+weights = post(sample.prop)/dnorm()
+
+```
+
+```{r}
+
+##want to sample from truncated Beta(2.7, 6.3) at [0.25, 0.75]
+## use ind prop fun unif[0.25, 0.75] 
+ff <- function(x){ ## only need to be able to eval unnormalized fun in MH
+  if ( x < 0.25 || x  > 0.75)
+    return(0)
+  dbeta(x, 2.7, 6.3)
+}
+res = rep(0, 10000)
+res[1] = 0.5
+for(i in 2:10000){
+  prop = runif(1, 0.25, 0.75)
+  acc = min(1, ff(prop)/ff(res[i-1]))
+  if(runif(1) < acc)
+    res[i] = prop
+  else
+    res[i] = res[i-1]
+}
+
+hist(res, prob=TRUE, col="BLUE", xlim = c(0,1))
+
+
+```
+```{r}
+#example EM-algorithm
+
+data <- c(0.1, 1.3, 0.9, 4.3, 4.9, 3.7, 2.1)
+p = rep(0, length(data))
+
+mu = 0.5
+for(i in 2:1000){
+  p = dnorm(data, mu, 1)/(dnorm(data, mu, 1) + dnorm(data, 0, 1))
+  mu = sum(p*data)/sum(p)
+  
+}
+plot(data, col="red", type="p")
+```
+```{r}
+likeli <- function(R_J, R_A){
+  return(exp(-R_J)*R_J^66*exp(-R_A)*R_A^48)
+}
+
+R_J = rgamma(10000, 240, 4)
+R_A = rgamma(10000, 200, 4)
+R = rgamma(10000, 220, 4)
+
+sum(likeli(R_J,R_A))/sum(likeli(R,R))
+
+
+```
+

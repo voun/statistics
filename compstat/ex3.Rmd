@@ -1,0 +1,180 @@
+---
+title: "ex3"
+output: html_document
+---
+
+
+```{r}
+url <- "https://ww2.amstat.org/publications/jse/datasets/fruitfly.dat.txt"
+data <- read.table(url)
+data <- data[,c(-1,-6)] # remove id and sleep
+names(data) <- c("partners","type","longevity","thorax")
+thorax = data$thorax
+partners = factor(data$partners)
+longevity = data$longevity
+type = factor(data$type)
+
+pairs(data)
+plot(thorax,longevity,type="p",col=partners,pch=c(16,17,18)[type])
+
+i1 = which(partners == 0)
+i2 = which(partners == 1)
+i3 = which(partners == 8)
+
+par(mfrow = c(1,3))
+plot(thorax[i1],longevity[i1],type="p",col="red",pch=c(16,17,18)[factor(type[i1])],ylim = c(20,100))
+plot(thorax[i2],longevity[i2],type="p",col="black",pch=c(16,17,18)[factor(type[i2])],ylim = c(20,100))
+plot(thorax[i3],longevity[i3],type="p",col="green",pch=c(16,17,18)[factor(type[i3])],ylim = c(20,100))
+
+g1 = subset(data,partners == 8 & type == 0)
+g2 = subset(data,partners == 8 & type == 1)
+g3 = subset(data,partners == 1 & type == 1)
+g4 = subset(data,partners == 1 & type == 0)
+g5 = subset(data,partners == 0 & type == 9)
+
+d1 = (partners == 8)*(type == 0)
+d2 = (partners == 8)*(type == 1)
+d3 = (partners == 1)*(type == 1)
+d4 = (partners == 1)*(type == 0)
+d5 = (partners == 0)*(type == 9)
+
+data2 = data.frame(
+  g1 = g1$thorax,
+  g2 = g2$thorax,
+  g3 = g3$thorax,
+  g4 = g4$thorax,
+  g5 = g5$thorax
+)
+
+boxplot(data2,col=c("red","blue","green","yellow","purple"),ylab="thorax")
+
+th = c(g1$thorax,g2$thorax,g3$thorax,g4$thorax,g5$thorax)
+ind = c(rep(1,nrow(g1)),rep(2,nrow(g2)),rep(3,nrow(g3)),rep(4,nrow(g4)),rep(5,nrow(g5)))
+anova = aov(th~ind)
+summary(anova) ##p-val about 7.7% so don't reject all have same mean, which is expeted flies were places randomly with females
+#and this cant affect thorax length
+
+fit = lm(longevity ~ 0+d1+d2+d3+d4+d5)
+summary(fit)
+
+
+```
+
+
+```{r}
+url <- "https://raw.githubusercontent.com/jawj/coffeestats/master/lifeexp.dat"
+data <- read.table(url, sep="\t", header=T, row.names=1)
+data <- data[,c("LifeExp","People.per.TV","People.per.Dr")]
+
+par(mfrow = c(1,3))
+LifeExp = data$LifeExp
+pptv = data$People.per.TV
+ppdr = data$People.per.Dr
+
+hist(LifeExp,col="blue")
+hist(pptv,col="red")
+hist(ppdr,col="green")
+pairs(data)
+
+EXP <-data[order(LifeExp,decreasing=TRUE),]
+TV = data[order(pptv,decreasing=TRUE),]
+DR = data[order(ppdr,decreasing=TRUE),]
+
+data = data[complete.cases(data),]
+
+fit = lm(LifeExp ~ log2(People.per.TV)+log2(People.per.Dr),data=data)
+summary(fit)
+pred.frame = data.frame(People.per.TV = 50,People.per.Dr = 3000)
+predict(fit,pred.frame,interval="c") ##confint for E[y_0]
+predict(fit,pred.frame,interval="p") ##pred interval for y_0
+
+plot(fit,which = 1)
+plot(fit,which = 2)
+plot(fit,which = 4)
+plot(fit,which = 5)
+
+fit2 = lm(LifeExp[-c(17,30)] ~ log2(People.per.TV[-c(17,30)])+log2(People.per.Dr[-c(17,30)]),data=data)
+summary(fit2)
+## remove bad ones to get better CI and PI
+predict(fit2,pred.frame,interval="c") ##confint for E[y_0]
+predict(fit2,pred.frame,interval="p") ##pred interval for y_0
+
+
+```
+
+
+```{r}
+
+f <- function(x){ .3* x - 0.2*x^2 + 0.1*x^3 + sin(2*x) }
+span <- c(0.1,0.2,0.3,0.45,0.7,1) # smoothing parameter for loess:
+sigma <- 1.5 # standard devation of noise
+n <- 100 # sample size
+grid<-seq(-5,5,length=100)
+x <- seq(from=-5,to=5, length=n) # x-values (fixed throughout simulation)
+xtest<-2
+par(mfrow=c(2,3))
+for (i in 1:length(span)){
+  plot(x,f(x), type="l", lwd=2, main=paste("alpha=",span[i]))
+  for(j in 1:25){
+    y <- f(x) + rnorm(n=length(x),mean=0,sd=sigma)
+    lo <- loess(y ~ x, span=span[i])
+    lines(x, predict(lo, x),col="gray")
+    abline(v=xtest, lty=3)
+  }
+}
+
+##can see for low alpha high variance and low bias while for high alpha
+## low variance and high bias, so to get low test error should take one in the middle
+## like alpha = 0.5
+## small alpha complex model
+## if smalll alpha then noise play larger role so high variance!
+## if large alpha then noise less role so less variance!
+
+
+f <- function(x){ .3* x - 0.2*x^2 + 0.1*x^3 + sin(2*x) }
+span <- c(0.1,0.2,0.3,0.45,0.7,1) # smoothing parameter for loess:
+sigma <- 1.5 # standard devation of noise
+n <- 100 # sample size
+x <- seq(from=-5,to=5, length=n) # x-values (fixed throughout simulation)
+xtest<-2
+par(mfrow=c(2,3))
+for (i in 1:length(span)){
+  vals = rep(0,1000)
+  for(j in 1:1000){
+    y <- f(x) + rnorm(n=length(x),mean=0,sd=sigma)
+    lo <- loess(y ~ x, span=span[i])
+    vals[j] = predict(lo,xtest)
+  }
+  hist(vals,prob=TRUE,main=paste("alpha=",span[i]))
+  abline(v=f(xtest))
+}
+
+
+
+```
+
+```{r}
+f <- function(x){ .3* x - 0.2*x^2 + 0.1*x^3 + sin(2*x) }
+span <- c(0.1,0.2,0.3,0.45,0.7,1) # smoothing parameter for loess:
+sigma <- 1.5 # standard devation of noise
+n <- 100 # sample size
+x <- seq(from=-5,to=5, length=n) # x-values (fixed throughout simulation)
+xtest<-2
+
+mat = matrix(numeric(length(span)*1000),ncol=length(span))
+for (i in 1:length(span)){
+  vals = rep(0,1000)
+  for(j in 1:1000){
+    y <- f(x) + rnorm(n=length(x),mean=0,sd=sigma)
+    y_test = f(xtest)+rnorm(1,mean=0,sd=sigma)
+    lo <- loess(y ~ x, span=span[i])
+    vals[j] = (predict(lo,xtest)-y_test)^2
+    mat[j,i] = predict(lo,xtest)
+  }
+  print(mean(vals))
+}
+
+bias = (apply(mat,2,mean)-f(xtest))^2
+var = apply(mat,2,var)
+```
+

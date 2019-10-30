@@ -1,0 +1,21 @@
+---
+title: "Lab 5"
+author: "Andreas Dahlberg"
+output:
+  pdf_document: default
+---
+
+```{r}
+n=10
+alpha=0.1
+
+Q <- function(x) 1-pnorm(x)
+Qinv <- function(x) qnorm(1-x)
+power <- function(x){
+  Q(Qinv(alpha)-sqrt(n*x*x))
+}
+
+mu <- seq(0+0.01,3,length=100)
+plot(mu,sapply(mu,power),type="l",ylab="power")
+```
+

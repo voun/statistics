@@ -1,0 +1,31 @@
+---
+title: "Lab 4"
+author: "Andreas Dahlberg"
+output:
+  pdf_document: default
+---
+
+#Problem 8d)
+
+Since $X+1 = Z$ where $Z$ is geometrically distributed with parameter $\pi$ this means that we can generate a sample from $X$ by first generating geometrically distributed random variables and then removing 1.
+
+```{r}
+T <- function(X){
+  sum(X)
+}
+
+likelihood <- function(t,X){
+  prod(dgeom(X,t))
+}
+
+x1 <- rgeom(200,0.4)
+x2 = sample(x1,length(x1),replace=FALSE)
+
+xseq <- seq(0+0.01,1-0.01,length=100)
+par(mfrow=c(1,2))
+plot(xseq,sapply(xseq,function(t) likelihood(t,x1)),type="l",col="blue")
+plot(xseq,sapply(xseq,function(t) likelihood(t,x2)),type="l",col="red")
+
+```
+
+$T$ is a sufficient statistic for $\pi$ and since we are sampling form $x_1$ without replacement we will get the same sample but in a different order. This means that $T(x1) = T(x2)$ so the sufficiency principle says that we should draw the same conclusions regarding $\pi$ from sample $x_1$ and sample $x_2$. We see that the likelihood functions for $x_1$ and $x_2$ are exactly the same which makes it reasonable to draw the same conclusions about $\pi$.

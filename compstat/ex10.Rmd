@@ -1,0 +1,110 @@
+---
+title: "ex10"
+output: pdf_document
+---
+
+```{r}
+
+library(gam)
+library(FNN)
+xtrain <- matrix(rnorm(20*100),ncol=20, nrow = 100)
+ytrain <- sin(2*xtrain[,1]) + 0.3*rnorm(100)
+dtrain <- data.frame(x=xtrain,y = ytrain)
+xtest <- matrix(rnorm(20*100),ncol=20, nrow = 100)
+ytest <- sin(2*xtest[,1]) + 0.3*rnorm(100)
+dtest <- data.frame(x=xtest,y = ytest)
+
+errors=rep(0,12)
+
+gam = gam(ytrain~s(xtrain[,1],4))
+pred = predict(gam,dtest)
+errors[1] = mean((pred-ytest)^2)
+
+mlr = lm(ytrain ~ xtrain[,1])
+pred = predict(mlr,dtest)
+errors[2] = mean((pred-ytest)^2)
+                              
+for(i in 1:10){
+  knn = knn.reg(matrix(xtrain[,1]),matrix(xtest[,1]),y=ytrain,k=i)$pred
+  errors[i+2] = mean((knn-ytest)^2)
+}
+
+#errors
+errors = matrix(rep(0,20*12),ncol=12)
+for(i in 1:20){
+  predictors = c()
+  for(j in 1:i){
+    predictors = append(predictors,paste("xtrain[,",as.character(j),"]",sep=""))
+  }
+  form <- as.formula(paste("ytrain~s(", 
+                             paste(predictors, collapse = ", 4)+s("),",4)", sep = ""))
+  ## as.formula g??r om en str??ng till en formula som kan anv??nda i lm
+  ## paste concatenatar str??ngar och as.character g??r om tal (numeric) till str??ng
+  gam = gam(form)
+  pred = predict(gam,dtest)
+  errors[i,1] = mean((pred-ytest)^2)
+  
+  mlr = lm(ytrain ~ xtrain[,1:i])
+  pred = predict(mlr,dtest)
+  errors[i,2] = mean((pred-ytest)^2)
+  
+  for(j in 1:10){
+  knn = knn.reg(matrix(xtrain[,1:i],ncol=i),matrix(xtest[,1:i],ncol=i),y=ytrain,k=j)$pred
+  errors[i,j+2] = mean((knn-ytest)^2)
+  }
+}
+errors[,5]
+print("***")
+errors[,1]
+print("***")
+errors[,2]
+## when dimension increases kNN regression suffers the most
+## the other also suffer but not so much
+
+
+```
+
+```{r}
+set.seed(1)
+n <- 100
+x1 <- rnorm(n)
+x2 <- rnorm(n)
+x3 <- rnorm(n)
+x4 <- rnorm(n)
+y <- 0.7 + x1 + 2*x2 + 0.5*x3 -3*x4 + rnorm(n)
+# second dataset
+x1_cor <- rnorm(n)
+x2_cor <- rnorm(n)
+x3_cor <- rnorm(n)
+x4_cor <- x1_cor + 0.4*rnorm(n)
+y_cor <- x1_cor + 2*x2_cor + 0.5*x3_cor -3*x4_cor + rnorm(n)
+
+backfitting <- function(X,y){
+  eps = 0.001
+  error = 100
+  p = dim(X)[2]
+  n = dim(X)[1]
+  g = matrix(rep(0,n*p),ncol=p)
+  intercepts = rep(0,p)
+  regr_coeffs = rep(0,p)
+  mu = mean(y)
+  
+  while(error >= eps){
+    error = 0
+    for(i in 1:p){
+      old = regr_coeffs[i]
+      fit = lm(y-mu-apply(g[,-i],1,sum)~X[,i])
+      intercepts[i] = summary(fit)$coefficients[1,1]
+      regr_coeffs[i] = summary(fit)$coefficients[2,1]
+      g[,i] = predict(fit,data.frame(X[,i]))
+      error = max(error,abs(old-regr_coeffs[i]))
+    }
+  }
+  
+  return(c(mu+sum(intercepts),regr_coeffs))
+}
+
+X = cbind(x1_cor,x2_cor,x3_cor,x4_cor)
+coeffs = backfitting(X,y_cor)
+```
+

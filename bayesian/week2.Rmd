@@ -1,0 +1,177 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+```{r}
+library(LearnBayes)
+library(lattice)
+p = seq(0, 1, by = 0.125) 
+prior = c(0.01, 0.950, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08, 0.08)
+PRIOR = data.frame("prior", p, prior)
+#take 10 cards and Bob is right 6 times
+posterior = pdisc(p, prior, c(6, 4))
+POSTERIOR = data.frame("posterior", p, posterior)
+names(PRIOR) = c("type", "p", "prob")
+names(POSTERIOR) =  c("type", "p", "prob")
+df = rbind(PRIOR, POSTERIOR)
+xyplot(prob~p | type, data = df, type="h", col="black") #so now seem to be telepathic
+#posterior är discrete så måste dela med summan för att normalisera
+```
+
+```{r}
+library(LearnBayes)
+joe.prior = c(0.5, 0.2, 0.2, 0.05, 0.05) #for 0.1, 0.2, 0.3, 0.4 and 0.5
+p = seq(0.1, 0.5, by=0.1)
+#sam.prior = beta(3, 12)
+
+sam_sample = rbeta(10000, 3, 12)
+joe_sample = sample(p, 1000, replace=TRUE, prob = joe.prior)
+
+mean_sam = mean(sam_sample)
+sd_sam = sqrt(var(sam_sample))
+mean_joe = mean(joe_sample)
+sd_joe = sqrt(var(joe_sample))
+
+##får nu 12st personer. Vill predicta y = antalet som åker till skolan kollektivtrafik
+## dvs ta fram prior predictive för de båda priors. Denna är diskret fördelning
+## och kan anta värden 0,1,...,12
+
+pred_joe = pdiscp(p, joe.prior, 12, 0:12)
+pred_sam = pbetap(c(3, 12), 20, 0:12)
+plot(pred_joe, type="l", col="blue")
+lines(pred_sam, type="l", col="red")
+
+```
+```{r}
+library(LearnBayes)
+#want to learn about parameter mu. 
+#y1,...,yn ~ N(mu, 10^2)
+prior = c(0.1, 0.15, 0.25, 0.25, 0.15, 0.1)
+mus = seq(20, 70, by = 10)
+data = c(38.6, 42.4, 57.5, 40.5, 51.7, 67.1, 33.4, 60.9, 64.1, 40.1, 40.7,6.4)
+likeli = exp(-length(data)/200*(mus-mean(data))^2)
+post = likeli*prior/sum(likeli*prior)
+
+matrix = matrix(c(mus, prior), ncol=2, byrow=FALSE)
+set = discint(matrix, 0.8)$set
+
+```
+
+```{r}
+data =  c(0, 10, 9, 8, 11, 3, 3, 8, 8, 11)
+thetas = seq(-2, 12, by=0.1)
+post <- function(theta){
+  prod(1/(1+(data-theta)^2))
+}
+posterior = sapply(thetas, post)
+posterior = posterior/sum(posterior)
+exp_val = sum(thetas*posterior)
+sd = sqrt(sum((thetas-exp_val)^2*posterior))
+plot(thetas, posterior, type="l")
+```
+```{r}
+B = 200 ##not more than these many taxis. Number, N, of taxis uniform on {1,...,B}. 
+data = c(43, 24, 100, 35, 85) #data, can observe any taxi, i.e uniform on {1,...,N}
+post <- function(N){
+  
+  if (N >= max(data) && N <= B){
+    return(1/(N^length(data)))
+  }else{
+    return(0)
+  }
+}
+grid = 0:300
+posterior = sapply(grid, post)
+posterior = posterior/sum(posterior)
+mean = sum(grid*posterior)
+
+#want to find prob >= 150 cars
+prob = 1-sum(posterior[0:149])
+plot(grid, posterior, col="blue", main="posterior", type="l")
+```
+
+```{r}
+library(LearnBayes)
+sample.p1 = rbeta(10000, 100, 100)
+p1 = length(sample.p1[sample.p1 >= 0.44 & sample.p1 <= 0.56])/10000 #0.91 so ok
+simulate.beta.mix <- function(mix, args1, args2){
+  p = runif(1, 0, 1)
+  if(p<=mix){
+    return(rbeta(1, args1[1], args1[2]))
+  }
+  else{
+    return(rbeta(1, args2[1], args2[2]))
+  }
+}
+sample.p2 = replicate(10000, simulate.beta.mix(0.9, c(500, 500), c(1, 1)))
+p2 = length(sample.p2[sample.p2 >= 0.44 & sample.p1 <= 0.56])/10000 #also about 0.91 so ok
+#now 100 trials and 45 successes. Post = likeli*prior mixture of two betas other mix probs if prior2
+#if prior1 then post is beta(145, 155)
+
+sample.post1 = rbeta(10000, 145, 155)
+
+probs = c(0.9, 0.1)
+beta.par1 = c(500,500)
+beta.par2 = c(1,1)
+betapar = rbind(beta.par1, beta.par2)
+data = c(45, 55)
+
+mix.beta = binomial.beta.mix(probs, betapar, data)
+mix = mix.beta$probs
+betapar = mix.beta$betapar
+# so 0.9778 and 0.022 mixture and params are
+# (545, 555) and (45, 56)
+
+sample.post2 = replicate(10000, simulate.beta.mix(0.9778, c(545, 555), c(45,56)))
+
+cred.int1 = quantile(sample.post1, probs = c(0.05, 0.95))
+cred.int2 = quantile(sample.post2, probs = c(0.05, 0.95))
+#pretty similiar so have bayesian robustness (inference doesn't)
+#change so much when change prior
+
+```
+
+```{r}
+library(LearnBayes)
+data = c(9.0, 8.5, 7.0, 8.5, 6.0, 12.5, 6.0, 9.0, 8.5, 7.5, 8.0, 6.0, 9.0, 8.0, 7.0, 10.0, 9.0, 7.5, 5.0, 6.5)
+#data from N(mu,sigma^2). The usual noninformative prior for bivariate normal with both mean and sigma unknown is g(mu,sigma^2) ~ 1/sigma^2
+samples = normpostsim(data, m=1000)
+mu.samples = samples$mu
+sigma.samples = sqrt(samples$sigma2)
+cred.int.mu = quantile(mu.samples, probs = c(0.05, 0.95))
+cred.int.sigma = quantile(sigma.samples, probs = c(0.05, 0.95))
+
+#want to estimate 0.75 quantile of the normal distribution. This is an unknown parameter
+#p75 = μ + 0.674σ so p75|x = μ|x + 0.674σ|x
+samples.p75 = mu.samples + 0.674*sigma.samples #can be viewed as samples from posterior of p75 | x
+mu.p75 = mean(samples.p75)
+```
+
+
+```{r}
+library(LearnBayes)
+data = c(10, 11, 12, 11, 9) #these are rounded data nearest integer. Unrounded data is ~ N(mu,sigma2)
+posterior <- function(mu,sigma2){
+  prior = 1/sigma2
+  fun <- function(x){dnorm(x, mu, sqrt(sigma2))}
+  vec = sapply(data, function(d) integrate(fun, d-0.5, d+0.5)$value)
+  return(prod(vec)*prior)
+}
+mus = seq(8,13, length=100)
+sigma2 = seq(0.3,4, length=100)
+grid = expand.grid(mus,sigma2)
+POST = apply(grid, 1, function(args) posterior(args[1], args[2]))
+POST = POST/sum(POST)
+
+fsample = sample(nrow(grid), 10000, replace=TRUE, prob = POST)
+sample = grid[fsample,]
+ests = apply(sample, 2, mean) #gives 10.49 and 1.41
+
+```
+
+```{r}
+
+```
+
+

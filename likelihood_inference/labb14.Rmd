@@ -1,0 +1,27 @@
+---
+title: "labb14"
+author: "Andreas Dahlberg"
+output: pdf_document
+---
+
+```{r}
+library(TeachingDemos)
+
+to_optim <- function(a){
+  abs(integrate(function(x) dgamma(x,49.78,32.08),lower=0,upper=a)$value-0.5)
+}
+
+median = optim(1.5,to_optim,method="BFGS")$par
+
+x = seq(0,4,length=200)
+
+plot(x,dgamma(x,49.78,32.08),col="blue",type="l",ylab="")
+lines(x,dgamma(x,8.78,8.78),col="red",type="l")
+legend("topright",legend=c("posterior","prior"),col=c("blue","red"),lty=c(1,1),bty="n")
+
+hpd = hpd(function(x) qgamma(x,49.78,32.08),conf=0.95)
+abline(h=dgamma(hpd[1],49.78,32.08),col="green")
+points(hpd,dgamma(hpd,49.78,32.08),pch=19,col="green")
+```
+
+

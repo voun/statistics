@@ -1,0 +1,79 @@
+---
+title: "Lab 3"
+author: "Andreas Dahlberg"
+output:
+  pdf_document: default
+---
+
+
+
+#Problem 6a) and 6b)
+
+```{r}
+data <- rcauchy(5,location=2,scale=1)
+likeli <- function(t)
+  prod(dcauchy(data,t,1))
+
+log_likeli <- function(t)
+  sum(dcauchy(data,t,1,log=TRUE))
+
+x <- seq(-10,10,length=100)
+par(mfrow=c(1,2))
+plot(x,sapply(x,likeli),type="l",col="blue",main="n=5 likeli")
+plot(x,sapply(x,log_likeli),type="l",col="red",main="n=5 log likeli")
+
+```
+
+```{r}
+data <- rcauchy(100,location=2,scale=1)
+likeli <- function(t)
+  prod(dcauchy(data,t,1))
+
+log_likeli <- function(t)
+  sum(dcauchy(data,t,1,log=TRUE))
+
+x <- seq(-10,10,length=100)
+par(mfrow=c(1,2))
+plot(x,sapply(x,likeli),type="l",col="blue",main="n=100 likeli")
+plot(x,sapply(x,log_likeli),type="l",col="red",main="n=100 log likeli")
+```
+```{r}
+data <- rcauchy(1000,location=2,scale=1)
+likeli <- function(t)
+  prod(dcauchy(data,t,1))
+
+log_likeli <- function(t)
+  sum(dcauchy(data,t,1,log=TRUE))
+
+x <- seq(-10,10,length=100)
+par(mfrow=c(1,2))
+plot(x,sapply(x,likeli),type="l",col="blue",main="n=100 likeli")
+plot(x,sapply(x,log_likeli),type="l",col="red",main="n=100 log likeli")
+```
+
+We see that the peaks of the likelihood function gets narrower and narrower for larger sample sizes. This means that when we evaluate the likelihood function at different values it is possible that we "miss" some of the peaks. However, for the log likelihood function the peaks are not as narrow as for the likelihood function so for this method it is better to look at the log likelihood function.
+
+We also see that the maximum value for the likelihood function decreases and gets closer and closer to 0. So for large sample sizes it is possible that the value is so close to 0 that it will be interpreted as 0 in R (i.e the closest floating number is 0)
+
+#Problem 6c)
+
+```{r}
+library(MASS)
+data <- read.csv("artificialdata.csv")$x 
+
+log_likeli <- function(t)
+  sum(dcauchy(data,t,1,log=TRUE))
+
+ml1 = fitdistr(data,"cauchy",hessian=TRUE)
+ml2 = optim(3,function(t) -log_likeli(t),hessian=TRUE,method="BFGS")
+
+ml1$estimate[1]
+ml2$par
+ml2$hessian
+
+
+```
+
+The fitdistr finds the maximum likelihood of both the location and shape parameter. It probably uses gradient descent and then finds where the nearest maximum is. The hessian matrix is a 2x2 matrix that consists of all second derivatives of the function. Hence, it is the generalization of the second derivative of a function in one variable and can be used to determine if the stationary point is saddle point, local max or local min.
+
+In this case the optim function solves a one dimension optimization problem. The hessian is then just the second derivative of the function. We see that the hessian is positive. Since we minimize -log_likeli it means that the hessian of the log_likeli in this point is negative. The observed fisher information is then positive which means that the point is a local max.

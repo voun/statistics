@@ -1,0 +1,88 @@
+---
+title: "week3"
+output: pdf_document
+---
+```{r}
+m = 50000
+sample.binom <- function(m, n, p){
+  matrix = matrix(runif(m*n, 0, 1), ncol = n)
+  success = apply(matrix, 1, function(row) sum(row <= 0.2))
+}
+system.time(sample.binom(m, 25, 0.2))
+system.time(rbinom(m, 25, 0.2))
+
+hist(sample.binom(n, 25, 0.2), prob = TRUE, col = "blue")
+x = seq(0,10, by = 1)
+lines(x, dbinom(x, 25, 0.2), type="l")
+
+```
+
+```{r}
+generate.gamma <- function(m,n, beta){
+  matrix = matrix(rexp(m*n, 1), ncol = n)
+  apply(matrix, 1, function(row) beta*sum(row))
+}
+
+sample = generate.gamma(100000,5,1)
+hist(sample, col="blue", prob=TRUE)
+```
+
+```{r}
+x = seq(-5,5, length = 1000)
+
+f <- function(x){
+  return(exp(-x^2/2)*(sin(6*x)^2+3*(cos(x)*sin(x))^2+1))
+}
+plot(x,f(x), col="red", type="l")
+lines(x, dnorm(x,0,1), type="l", col="blue")
+
+my.fun <- function(x){
+  sqrt(2*pi)*(sin(6*x)^2+3*(cos(x)*sin(x))^2+1)
+}
+M = -optim(3, function(x) -my.fun(x), method="Brent", lower = 0, upper = 15)$value
+
+rej.sampling <- function(n){
+  total = 0
+  sample = c()
+  while(length(sample) <= n){
+    Y = rnorm(1, 0, 1)
+    U = runif(1, 0, 1)
+    if(U <= sqrt(2*pi)/M*(sin(6*Y)^2+3*(cos(Y)*sin(Y))^2+1)){
+      sample = append(sample,Y)
+    }
+    total = total+1
+      
+  }
+  return (c(n/total, sample))
+}
+sample = rej.sampling(40000)
+acc.rate = sample[1]
+sample = sample[-1]
+
+C = 1/(M*acc.rate)
+f.normalized <- function(x){
+  return(C*exp(-x^2/2)*(sin(6*x)^2+3*(cos(x)*sin(x))^2+1))
+}
+hist(sample, col ="BLUE", prob=TRUE, breaks=100)
+lines(x,f.normalized(x), type="l")
+
+```
+
+```{r}
+Nsim=10^4
+X=rep(0,Nsim)
+a = 2
+mu = 0
+sigma = 1
+for (i in 1:Nsim){
+  z=rnorm(1,mean=mu,sd=sigma)
+  while(z<a) 
+    z=rnorm(1,mean=mu,sd=sigma)
+  X[i]=z
+}
+
+
+
+
+```
+

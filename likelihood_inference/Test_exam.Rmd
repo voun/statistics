@@ -1,0 +1,55 @@
+---
+title: "Test exam"
+author: "Andreas Dahlberg"
+output:
+  pdf_document: default
+---
+
+#Problem 1
+```{r}
+#Problem 1a)
+temperatures <- read.csv("zurichtemp.csv")$Temperature
+
+log_likeli1 <- function(t,data){
+  sum(dnorm(data,t,sqrt(t),log=TRUE))
+}
+x <- seq(min(temperatures),max(temperatures),length=100)
+plot(x,sapply(x,function(t) log_likeli1(t,temperatures)),type="l",col="red",ylab="log-likeli")
+
+# Problem 1b)
+ML1 = optim(15,function(t) -log_likeli1(t,temperatures),method="BFGS")$par
+
+hist(temperatures,prob=TRUE,breaks=20,col="red")
+
+x<-seq(5,30,length=300)
+lines(x,dnorm(x,ML1,sqrt(ML1)),col="BLUE")
+
+# Problem 1c)
+log_likeli2 <- function(t){
+    sum(dnorm(temperatures,t[1],sqrt(t[1]+t[2]),log=TRUE))
+}
+
+ML2 = optim(c(15,0), function(t) -log_likeli2(t))$par
+lines(x,dnorm(x,ML2[1],sqrt(ML2[1]+ML2[2])),col="GREEN")
+legend("topright",legend=c("one-dim ML","two-dim ML"),col=c("BLUE","GREEN"),lty=c(1,1))
+
+
+# Problem 1d)
+cols=c("RED","BLUE","GREEN","PURPLE")
+x <- seq(3,35,length=200)
+for (i in 1:4){
+  sample = rnorm(20*i^2,ML1,sqrt(ML1))
+  ML = optim(15,function(t) -log_likeli1(t,sample),method="BFGS")$par
+  if (i == 1)
+    plot(x,sapply(x,function(t) log_likeli1(t,sample) - log_likeli1(ML,sample)),col=cols[i],type="l")
+  else
+    lines(x,sapply(x,function(t) log_likeli1(t,sample) -log_likeli1(ML,sample)),col=cols[i],type="l")
+} 
+
+```
+
+**1c)**
+Since there are two parameters $\theta$ and $\delta$ we have to do a two-dimensional optimization. This is seen in the code above
+
+**1e)**
+In 1d) we plot the relative log-likelihood for different samples. It is clear that the relative log-likelihood, and hence also the log-likelihood, converges to a parabola that gets narrower and narrower for increasing sample sizes. This can also be seen by doing a Taylor expansion for the log-likelihood around the ML-estimate of $\theta$. The relative log-likelihood can be interpreted as "the closer the value is to 0, the more likely it is". For large sample sizes we see that the only "likely" values of $\theta$ are the ones close to 15.

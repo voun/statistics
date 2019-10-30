@@ -1,0 +1,68 @@
+---
+title: "ovn"
+output: pdf_document
+author: "Andreas Dahlberg"
+---
+
+**First uppgift**
+```{r}
+data = rlnorm(10,0,sqrt(2))
+pdf <- function(x,params){
+  mu = params[1]
+  sigma = params[2]
+  1/(sigma*x*sqrt(2*pi))*exp(-(log(x)-mu)^2/(2*sigma^2))
+}
+
+x = seq(0.1,7,length=100)
+sigmas = c(0.25,1,1.5,10)
+cols = c("RED","BLUE","GREEN","PURPLE")
+for(i in 1:4){
+  if(i == 1)
+    plot(x,pdf(x,c(1,sigmas[i])),type="l",col=cols[i],ylab="",xlab="x")
+  else
+    lines(x,pdf(x,c(1,sigmas[i])),type="l",col=cols[i],ylab="",xlab="x")
+}
+
+likeli <- function(params){
+  prod((pdf(data,params)))
+}
+
+log_likeli <- function(params){
+  sum(log(pdf(data,params)))
+}
+
+opt = optim(c(0.5,1),function(params)-likeli(params),hessian=TRUE)
+ML = opt$par
+ML
+max = -opt$value
+
+hist(data,prob="TRUE",col="BLUE",breaks=5,ylim=c(0,0.8))
+lines(x,pdf(x,ML),col="red",type="l")
+
+mu = seq(-2,2,length=200)
+sigma = seq(0.1,4,length=200)
+grid = expand.grid(mu,sigma)
+z = apply(grid,1,function(params) likeli(params)/max)
+z = array(z,c(200,200))
+contour(mu,sigma,z,levels=c(1.0,0.8,0.5,0.3,0.2,0.07),xlab="mu",ylab="sigma")
+
+profile_likeli <- function(mu){
+  optim(2,function(sigma)-log_likeli(c(mu,sigma)),method="Brent",lower=0,upper=4)$par
+}
+mus = seq(-0.5,0.5,length=100)
+lines(mu,sapply(mu,profile_likeli),col="green",type="l")
+plot(mu,sapply(mu,function(mu) likeli(c(mu,profile_likeli(mu)))),col="green",type="l")
+
+
+
+```
+
+
+
+
+**second uppgift**
+```{r}
+
+```
+
+$\xi$ $\epsilon$ $and so on x \geq 5$

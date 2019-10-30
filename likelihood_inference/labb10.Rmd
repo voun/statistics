@@ -1,0 +1,60 @@
+---
+title: "labb 10"
+output: pdf_document
+---
+
+## Problem 18
+```{r}
+x1 = 6
+n1 = 108
+x2 = 2
+n2 = 103
+
+loglikeli <- function(x){
+  x1*log(exp(x[1]+x[2])/(1+exp(x[1]+x[2]))) + (n1-x1)*log(1-exp(x[1]+x[2])/(1+exp(x[1]+x[2])))+ x2*log(exp(x[2])/(1+exp(x[2])))+ (n2-x2)*log(1-exp(x[2])/(1+exp(x[2])))
+}
+
+profile_log_likeli <- function(phi){
+  
+  optim(-4,function(eta) -loglikeli(c(phi,eta)), method="BFGS")$par
+}
+par = optim(c(1,4), function(x) -loglikeli(x))$par
+max = loglikeli(par)
+
+phi = seq(-1.5,5,length=150)
+eta = seq(-8,-1,length=150)
+grid = expand.grid(phi,eta)
+z = apply(grid,1,function(x) loglikeli(x)-max)
+z = array(z,c(150,150))
+contour(phi,eta,z,levels=c(0,-0.5,-1,-1.5,-2,-2.5,-3,-3.5,-4,-4.5,-5),ylab="eta",xlab="phi")
+
+lines(phi,sapply(phi,profile_log_likeli),type="l",col="green")
+
+
+
+
+
+
+```
+## Problem 19
+
+```{r}
+library(MASS)
+X = c(225,175,198,189,189,130,162,135,119,162)
+n = length(X)
+a = seq(0.01,20,length=100)
+
+profile_log_likeli <- function(a){
+  n*log(a)-n*log(mean(X^a))+(a-1)*sum(log(X))-n
+  
+}
+plot(a,sapply(a,profile_log_likeli),type="l")
+
+profile_est = optim(5,function(a)-profile_log_likeli(a),method="BFGS")$par
+ML_est = fitdistr(X,"weibull")$estimate
+
+profile_est
+ML_est[1]
+```
+
+We see that the two estimates of $\alpha$ are almost the same which also makes sense.

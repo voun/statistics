@@ -1,0 +1,114 @@
+---
+title: "exam"
+output: pdf_document
+author: "Andreas Dahlberg"
+---
+
+
+**asd**
+```{r}
+
+data = read.csv("temperature23.csv")
+temp = data$temp
+days = data$X
+plot(days,temp,type="p",col="red",pch=19)
+hist(temp,prob="TRUE",col="BLUE",breaks=5)
+mean(temp)
+
+
+```
+
+The mean temperature is about 20.027 and the histogram indicates that is doesnt seem to be normal distributed, though we will use normality anyways.  We see that the pdf is normally disitrubted mean mu and sd = 1/2k
+
+**sdasd**
+```{r}
+
+ log_likeli1 <- function(mu){
+   sum(dnorm(temp,mu,sqrt(1/(2*mu))),log=TRUE)
+ }
+
+mus = seq(15,25,length=1000)
+opt = optim(15,function(mu) -log_likeli1(mu),method="Brent",lower=0,upper=50)
+ML = opt$par
+max = -opt$val
+
+plot(mus,sapply(mus,function(mu)log_likeli1(mu)-max),type="l",col="green")
+ML
+hist(temp,prob="TRUE",col="BLUE",breaks=5)
+x = seq(18,22,length=1000)
+plot(x,dnorm(x,ML,sqrt(ML/(2*ML))),col="red",type="l")
+
+
+log_likeli2 <- function(params){
+  mu = params[1]
+  k = params[2]
+  sum(dnorm(temp,mu,sqrt(1/(2*k)),log=TRUE))
+}
+
+optt = optim(c(18,45),function(params)-log_likeli2(params),hessian=TRUE)
+ML2 = optt$par
+max = -optt$val
+ML2
+
+mus = seq(18,25,length=100)
+k = seq(18,25,length=100)
+grid = expand.grid(mus,k)
+z = apply(grid,1,function(params)log_likeli2(params)-max) 
+z = array(z,c(100,100))
+contour(mus,k,z,levels=c(0,-0.3,-0.8,-1.5,-3.0,-3.5,-5,-7,-10),xlab="shape",ylab="scale")
+
+
+```
+
+
+the estimate of mu is about 20.0 which is approx the sample mean of temperature. This is good. We see that the pdf and the histogram of temperatures don't align good but not bad either. Probably a sample of size 30 is too litt.e
+
+```{r}
+
+data = c(17.5,22.1,10.2,16.9,20.0,8.1,14.6,21.3,16.4)
+n = length(data)
+
+log_likeli <- function(x){
+  mu = x[1]
+  a = x[2]
+  n*log(a)-a*n*log(mu)+(a-1)*sum(log(data))-1/(mu^a)*sum(data^a)
+}
+
+opt = optim(c(5,5),function(x)-log_likeli(x),hessian=TRUE)
+ML = opt$par
+max = -opt$val
+observed_fisher=opt$hessian
+se = sqrt(diag(solve(observed_fisher)))
+
+
+profile_likeli <- function(a){
+  optim(15,function(mu)-log_likeli(c(mu,a)),method="Brent",lower=0,upper=50)$par
+}
+as = seq(1,7,length=100)
+plot(as,sapply(as,function(a) log_likeli(c(profile_likeli(a),a)))-max,col="green",type="l",ylab="")
+
+wald_a = ML[2]+c(-1,1)*1.96*se[2]
+wald_a
+
+a = 4
+as = c()
+ns = c(10,50,100,250,500,1000,5000)
+for (i in 1:length(ns)){
+  n = ns[1]
+  data = rnorm(n,17,4)
+  
+  log_likeli <- function(x){
+  mu = x[1]
+  a = x[2]
+  n*log(a)-a*n*log(mu)+(a-1)*sum(log(data))-1/(mu^a)*sum(data^a)
+  }
+  ML = optim(c(15,4),function(x)-log_likeli(x),hessian=TRUE)$par
+  as = append(as,ML[2])
+}
+plot(ns,as,type="p",col="blue")
+abline(h=4)
+
+
+```
+
+The 95 percent confint for a is about 2 and 6.85

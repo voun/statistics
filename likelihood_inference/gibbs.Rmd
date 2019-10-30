@@ -1,0 +1,20 @@
+---
+title: "gibbs"
+author: "Andreas Dahlberg"
+output: pdf_document
+---
+
+```{r}
+x = rchisq(200,5)
+medel = mean(x)
+theta = matrix(nrow = 200,ncol=2)
+theta[1,] = c(1,1)
+for (i in 2:200){
+  a = rgamma(1,n+1,theta[i-1,2]*n*medel+1)
+  b = rgamma(1,n+1,a*n*medel+1)
+  theta[i,] = c(a,b)
+}
+
+m = c(mean(theta[,1]),mean(theta[,2]))
+```
+

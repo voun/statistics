@@ -1,0 +1,199 @@
+---
+title: "ex5"
+output: pdf_document
+---
+
+```{r}
+## sample size n and sample with replacement uniformly,
+##i.e from the empirical distribution. P(X_j not in bootstrap sample) = (1-1/n)^n so P(X_j in bootstrap sample) = 1-(1-1/n)^n
+
+p_in_bs_sample <- function(n){
+  return(1-(1-1/n)^n)
+}
+
+ns = 1:10000
+plot(log(ns),sapply(ns,p_in_bs_sample),type="l",col="green")
+
+## Let X = antal obs som ??r i bootstrap sample = sum_{k=1}^n I_k where
+## I_k = 1 if obs nr k is in bs sample and 0 otherwise, prob is
+## 1-(1-1/n)^n. So E[X] = n*(1-(1-1/n)^n) s?? andelen som ??r 
+## i bs sample ??r d?? 1-(1-1/n)^n which is about 1-1/e
+
+```
+
+```{r}
+## trimmed mean is a parameter removing smallest 10% of area and largest
+## 10% and taking expectation of remaining. This corresponds to if have large sample and remove smallest 10 percent and largest 10 percent and taking mean of remaining
+library(boot)
+
+X = rgamma(40,shape=1,rate=1) ##now know gamma so maybe param bs?
+trimmed_mean = mean(X,trim=0.1)
+true_param = mean(rgamma(10000,shape=1,rate=1),trim=0.1)
+boot_samples = 1000
+
+loglikeli <- function(x){
+  shape = x[1]
+  rate = x[2]
+  sum(dgamma(X,shape,rate,log=TRUE))
+}
+ML = optim(c(2,3),function(x) -loglikeli(x))$par #n??r anv??nder optim s?? m??ste funktionen ta in en vektor!?
+shape = ML[1]
+rate = ML[2]
+print(ML)
+
+
+perc_nonparam <- function(){
+  sample = sample(X,length(X),replace=TRUE)
+  mean(sample,trim=0.1)
+}
+perc_param <- function(){
+  sample = rgamma(length(X),shape=shape,rate=rate)
+  mean(sample,trim=0.1)
+}
+
+ci_perc_nonparam = replicate(boot_samples,perc_nonparam())
+quantiles = quantile(ci_perc_nonparam,c(0.025,0.975))
+ci = c(quantiles[1],quantiles[2])
+print(ci)
+
+ci_perc_param = replicate(boot_samples,perc_param())
+quantiles = quantile(ci_perc_param,c(0.025,0.975))
+ci = c(quantiles[1],quantiles[2])
+print(ci)
+
+calc_trimmed_mean <- function(data,indices,trim=0.1){
+  sample = data[indices]
+  mean(sample,trim=0.1)
+}
+res.boot = boot(X,calc_trimmed_mean,boot_samples)
+est = res.boot$t0
+bs_est = res.boot$t
+quantiles = quantile(bs_est,c(0.025,0.975))
+ci = c(2*est-quantiles[2],2*est-quantiles[1])
+print(ci)
+
+
+## we can use normal bs ci if thetat_hat is asymptotically normal around true param and since it is a sum of rv's this is true.
+
+var = var(bs_est)
+ci = est+c(-1,1)*1.96*sqrt(var)
+print(ci)
+
+t_star = rep(0,1000)
+bs_est = rep(0,1000)
+for(i in 1:1000){
+  sample1 = sample(X,length(X),replace=TRUE)
+  inner_bsest = rep(0,1000)
+  for(j in 1:1000){
+    sample2 = sample(sample1,length(sample1),replace=TRUE)
+    inner_bsest[j] = mean(sample2,trim=0.1)
+  }
+  bs_est[i] = mean(sample1,trim=0.1)
+  t_star[i] = (mean(sample1,trim=0.1)-trimmed_mean)/sqrt(var(inner_bsest))
+}
+quantiles = quantile(t_star,c(0.025,0.975))
+se = sqrt(var(bs_est))
+ci = c(trimmed_mean-se*quantiles[2],trimmed_mean-se*quantiles[1])
+print(ci)
+
+
+```
+
+```{r}
+library(boot)
+
+X = rgamma(40,shape=1,rate=1) ##now know gamma so maybe param bs?
+trimmed_mean = mean(X,trim=0.1)
+true_param = mean(rgamma(100000,shape=1,rate=1),trim=0.1)
+boot_samples = 500
+
+calc_trimmed_mean <- function(data,indices,trim=0.1){
+  sample = data[indices]
+  mean(sample,trim=0.1)
+}
+
+bs_ci <- function(n,type){
+  mat = matrix(rep(0,2*100),ncol=2)
+  for(i in 1:100){
+    sample = rgamma(n,shape=1,rate=1)
+    res.boot = boot(sample,calc_trimmed_mean,boot_samples)
+    ci = c(0,0)
+    if (type == "basic"){
+      ci = (boot.ci(res.boot,conf=0.95,type="basic")$basic)[-c(1,2,3)]
+    }
+    else if(type == "norm"){
+      ci = (boot.ci(res.boot,conf=0.95,type="norm")$norm)[-1]
+    }
+    else{
+      ci = (boot.ci(res.boot,conf=0.95,type="perc")$perc)[-c(1,2,3)]
+    }
+    mat[i,] = ci
+  }
+  return(mat)
+}
+
+par(mfrow = c(2,2))
+ns = c(10,40,160,640)
+
+##basic
+under = 0
+over = 0
+mat = matrix(numeric(2*length(ns)),nrow=2)
+for(j in 1:length(ns)){
+  n = ns[j]
+  cis = bs_ci(n,"norm")
+  for (i in nrow(cis)){
+    ci = cis[i,]
+    if (true_param > cis[2])
+      over = over+1
+    else if(true_param < cis[1])
+      under = under+1
+  }
+  mat[,j] = c(under/iterations,over/iterations)
+}
+plot(ns,-mat[1,],type="p",col="red",cex=0.7 , pch=19,main="basic",ylim=c(-0.05,0.05))
+lines(ns,mat[2,],type="p",col="blue",cex=0.7 , pch=19)
+
+
+##norm
+under = 0
+over = 0
+mat = matrix(numeric(2*length(ns)),nrow=2)
+for(j in 1:length(ns)){
+  n = ns[j]
+  cis = bs_ci(n,"basic")
+  for (i in nrow(cis)){
+    ci = cis[i,]
+    if (true_param > cis[2])
+      over = over+1
+    else if(true_param < cis[1])
+      under = under+1
+  }
+  mat[,j] = c(under/iterations,over/iterations)
+}
+plot(ns,-mat[1,],type="p",col="red",cex=0.7 , pch=19,main="norm",ylim=c(-0.05,0.05))
+lines(ns,mat[2,],type="p",col="blue",cex=0.7 , pch=19)
+
+##perc
+under = 0
+over = 0
+mat = matrix(numeric(2*length(ns)),nrow=2)
+for(j in 1:length(ns)){
+  n = ns[j]
+  cis = bs_ci(n,"perc")
+  for (i in nrow(cis)){
+    ci = cis[i,]
+    if (true_param > cis[2])
+      over = over+1
+    else if(true_param < cis[1])
+      under = under+1
+  }
+  mat[,j] = c(under/iterations,over/iterations)
+}
+plot(ns,-mat[1,],type="p",col="red",cex=0.7 , pch=19,ylim=c(-0.05,0.05),main="perc")
+lines(ns,mat[2,],type="p",col="blue",cex=0.7 , pch=19)
+
+
+
+```
+

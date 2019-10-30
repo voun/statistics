@@ -1,0 +1,107 @@
+---
+title: "ex7"
+output: pdf_document
+---
+
+```{r}
+library(MASS)
+?immer
+data(immer)
+data = immer[,c(3,4)]
+M = 1000000
+#varje rad yield f??rsta ??r och sen yield andra ??r f??r en viss plats
+#H0 ??r D_i = X_i-Y_i symmetrisk kring 0 och HA ??r
+#HA ??r symmetrisk kring a, a > 0.
+#notera detta ??r paired assignment s?? anv??nder Wilcoxon signed rank sum test
+plot(data)
+lines(c(60:200),c(60:200),type="l")
+
+diff.vec = data[,1]-data[,2]
+obs.rank = rank(abs(diff.vec))
+obs.sign.ranks = sign(diff.vec)*obs.rank
+obs.statistic = sum(obs.sign.ranks[obs.sign.ranks >= 0])
+
+wilcox = numeric(M)
+for(i in 1:M){ ##kan ocks?? g??ra en replicate
+  swaps = sample(c(-1,1),length(diff.vec),replace=TRUE)
+  sample = diff.vec*swaps
+  
+  ranks = rank(abs(sample))
+  sign.ranks = sign(sample)*ranks
+  statistic = sum(sign.ranks[sign.ranks >= 0])
+  wilcox[i] = statistic
+}
+hist(wilcox,freq=F,col="blue")
+abline(v=obs.statistic,col="red")
+## mot HA ??r eq med statistik stor
+pval = (sum(wilcox >= obs.statistic)+1)/(length(wilcox)+1)
+#pval typ 0.02 s?? f??rkasta H0 och acceptera HA att f??rdelningen 
+# ??r symmetrisk kring a, a>0 s?? verkar som att hade mer sk??rd f??rsta ??ret
+
+wilcox.test(diff.vec,alternative="greater")
+
+```
+
+
+
+```{r}
+data = read.csv("data_ex3.csv")
+y = data[,1]
+x = data[,2]
+x2 = x^2
+x3 = x^3
+
+fit = lm(y~x+x2+x3)
+plot(x,fitted.values(fit),type="l",col="blue")
+lines(x,y,col="red",type="p")
+summary.f.test = summary(fit)$fstatistic
+pval = 1-pf(summary.f.test[1],summary.f.test[2],summary.f.test[3])
+statistic = summary.f.test[1]
+#using the ANOVA (which uses the an F-statistic so F-test)
+#the p-value for H0: b1=b2=b3=0 is 0.017 so reject it
+# hopefully this works eventhough residuals not normal
+reject = qf(0.95,summary.f.test[2],summary.f.test[3])
+
+
+#kom ih??g p-v??rdet ??r en random var eftersom sample random
+sim_statistic <- function(){
+  y = 3+15*(rgamma(length(x),2,1)-2)
+  fit = lm(y~x+x2+x3)
+  statistic = (summary(fit)$fstatistic)[1]
+}
+
+statistics = replicate(2500,sim_statistic())
+type1.error.rate = sum((statistics >=reject)*1)/length(statistics)
+## so prob of doing type1 error is about sign level alpha (0.05 in this case)
+
+sim_statistic2 <- function(){
+  y = 0.5*x-0.003*x2+0.0001*x3+15*(rgamma(length(x),2,1)-2)
+  fit = lm(y~x+x2+x3)
+  statistic = (summary(fit)$fstatistic)[1]
+}
+
+statistics = replicate(2500,sim_statistic2())
+power = sum((statistics >= reject)*1)/length(statistics)
+#power around 0.29 which is very low but coefficients 
+#close to 0 so makse sense
+
+#now estimate distribution of our parameter under H0,
+#can then permute the y-values
+
+sim_statistic3 <- function(){
+  ynew = sample(y,length(y),replace=FALSE)
+  fit = lm(ynew~x+x2+x3)
+  statistic = (summary(fit)$fstatistic)[1]
+}
+statistics = replicate(3000,sim_statistic3())
+hist(statistics,col="blue",prob=TRUE,xlim=c(0,5),breaks=100)
+abline(v=statistic,col="red")
+pval2 = (sum(statistics >= statistic)+1)/(length(statistics)+1)
+```
+
+
+```{r}
+diff.vec = c(0.5,1)
+wilcox.test(diff.vec,alternative="greater") #med wilcox.test kan g??ra b??de unsigned och signed
+```
+

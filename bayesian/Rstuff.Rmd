@@ -1,0 +1,50 @@
+---
+title: "Rstuff"
+output: pdf_document
+---
+
+```{r}
+library(LearnBayes)
+probs = c(0.5, 0.5)
+beta.par1 = c(6,14)
+beta.par2 = c(14,6)
+betapar = rbind(beta.par1, beta.par2)
+data = c(7,3)
+post = binomial.beta.mix(probs, betapar, data)
+post$probs ## mix prob
+post$betapar
+```
+
+```{r}
+n = 20
+p = 0.5
+set.seed(5)
+
+conf.int <- function(y,n){ ## 90% CI
+  phat = y/n
+  z = qnorm(0.95)
+  se = sqrt(phat*(1-phat)/n)
+  return(c(phat-z*se, phat+z*se))
+}
+is.in.CI <- function(ci){
+  
+  if(p >= ci[1] & p <= ci[2])
+    return(TRUE)
+  else
+    return(FALSE)
+}
+count = 0
+y = rbinom(100, n, p)
+coverage = sum(sapply(y, function(obs) is.in.CI(conf.int(obs, n))))/100
+```
+
+```{r}
+library(expm)
+options(digits=20)
+M1 = matrix(runif(4, 0, 1), ncol = 2)
+M = t(apply(M1, 1, function(row) row/sum(row)))
+
+A = M%^%500
+sum(A[1,]) ##numerical inaccuracy
+```
+

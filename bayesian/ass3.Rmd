@@ -1,0 +1,163 @@
+---
+title: "ass3"
+output: html_document
+---
+
+```{r}
+notices = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+count = c(162, 267, 271, 185, 111, 61, 27, 8, 3, 1)
+iter = 2000
+
+p_jfun <- function(j, params){
+  p = params[1]
+  l1 = params[2]
+  l2 = params[3]
+  
+  return(p*exp(-l1)*l1^j/(p*exp(-l1)*l1^j+(1-p)*exp(-l2)*l2^j))
+}
+
+l1_start = 0.5
+l2_start = 0.5
+p_start = 0
+
+stat_points = matrix(numeric(3*1101), ncol=3)
+
+ind = 1
+for(k1 in 0:9){
+  for(k2 in 0:9){
+    for(k3 in 0:10){
+      start = c(p_start+0.1*k3, l1_start+k2, l2_start+k1);
+      res = matrix(numeric(3*iter), ncol = 3)
+      res[1,] = start
+      for(i in 2:iter){
+          
+        p_js = p_jfun(0:9, res[i-1, ])
+        
+        p_new = sum(count*p_js)/sum(count)
+        l1_new = sum(notices*count*p_js)/(1+sum(count*p_js))
+        l2_new = sum(notices*count*(1-p_js))/(1+sum(count*(1-p_js)))
+        
+        res[i,1] = p_new
+        res[i,2] = l1_new
+        res[i,3] = l2_new
+        
+      }
+      ind = ind+1
+      stat_points[ind,] = res[iter,]
+    }
+  }
+}
+
+logpost <- function(par){
+  p = par[1]
+  l1 = par[2]
+  l2 = par[3]
+  return(sum(count*log(p*exp(-l1)*l1^notices/factorial(notices)+(1-p)*exp(-l2)*l2^notices/factorial(notices)))-l1-l2)
+}
+
+#only need to check 3 by symmetry
+stat_points = matrix(numeric(3*3), ncol=3)
+stat_points[1,] = c(0, 0, 2.155)
+stat_points[2,] = c(0.261, 1.052198, 2.544021)
+stat_points[3,] = c(0.5, 2.153, 2.153)
+
+res = c(logpost(stat_points[1,]), logpost(stat_points[2,]), logpost(stat_points[3,]))
+#so (p, l1, l2) = (0.262, 1.053, 2.543) is a global maximum to the posteriod
+
+ml = sum(notices*count)/sum(count)
+
+plot(notices, count, type="p", col="red", main="poisson", xlab="death notices", ylab="day count", ylim=c(0,300))
+lines(notices, 1096*dpois(notices, ml), col="blue", type="p")
+legend("topright", legend=c("actual count", "predicted count"), col=c("red", "blue"), lw=c(1,1))
+
+plot(notices, count, type="p", col="red", main="mixture of 2 poissons", xlab="death notices", ylab="day count", ylim=c(0,300))
+lines(notices, 1096*(0.261*dpois(notices, 1.052198)+(1-0.261)*dpois(notices, 2.544021)), col="blue", type="p")
+legend("topright", legend=c("actual count", "predicted count"), col=c("red", "blue"), lw=c(1,1))
+
+
+
+
+
+```
+
+```{r}
+
+res = numeric(20000)
+preds = numeric(20000)
+res[1] = 0.5
+preds[1] = 1-pbinom(6, 10, res[1])
+sum = 0
+for (i in 2:20000){
+  prop = rnorm(1, res[i-1], 0.5)
+  acc = min(1, dbeta(prop, 18, 9)/dbeta(res[i-1], 18, 9))
+  if(runif(1, 0, 1) < acc)
+    res[i] = prop
+  else
+    res[i] = res[i-1]
+  preds[i] = 1-pbinom(6, 10, res[i])
+  
+  if (rbinom(1, 10, res[i]) >= 7)
+    sum = sum+1
+  
+}
+par(mfrow = c(1,2))
+plot(res)
+acf(res)
+prob1 = mean(preds)
+prob2 = sum/(20000-1)
+
+res = res[(1:200)*50] ##now we have an almost true sample
+acf(res)
+
+
+
+##DO ANOTHER PREDICTION MEAN CHECK TRACEPLOTS THINNING ACF
+```
+```{r}
+library(LearnBayes)
+data(cars)
+attach(cars)
+
+log_post <- function(theta){
+  sum(dnorm(cars[,2], theta[1]+theta[2]*cars[,1]+theta[3]*cars[,1]^2, theta[4], log=TRUE))
+}
+
+speed2 = speed^2
+fit <- lm(dist ~ speed+speed2, data=cars)
+start = c(2.5, 0.1, 0.1, 15.5)
+lap.approx = laplace(log_post, start)
+start = lap.approx$mode
+steps = sqrt(diag(lap.approx$var))/10
+
+res = matrix(numeric(4*20000), ncol = 4)
+res[1,] = start
+pred = numeric(20000)
+pred[1] = rnorm(1, res[1,1]+res[1,2]*21+res[1,3]*21^2, res[1,4])
+
+for(i in 2:20000){
+  prop = res[i-1,]+rnorm(4, 0, steps)
+  acc = min(1, exp(log_post(prop))/exp(log_post(res[i-1,])))
+  if(runif(1,0,1) < acc)
+    res[i,] = prop
+  else
+    res[i,] = res[i-1,]
+  pred[i] = rnorm(1, res[i,1]+res[i,2]*21+res[i,3]*21^2, res[i,4])
+}
+
+for(i in 1:4)
+  plot(res[,i], type="l")
+res[-(1:1000),]
+conf = quantile(pred, probs = c(0.025, 0.975))
+est = mean(pred)
+
+acf(res[,4])
+
+
+
+```
+```{r}
+sample = rexp(100000,1)
+1/sqrt(2*pi)*mean(exp(-1/2*(sample+3)^2+sample))
+1-pnorm(3,0,1)
+```
+

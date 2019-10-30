@@ -1,0 +1,79 @@
+---
+title: "Lab 8"
+author: "Andreas Dahlberg"
+output:
+  pdf_document: default
+---
+
+
+#Problem 1)
+**1a**
+```{r}
+mean = c()
+max = c()
+for (i in 1:1000){
+  sample = runif(100,0,1)
+  max = append(max,max(sample))
+  mean = append(mean,mean(sample))
+}
+par(mfrow = c(1,2))
+hist(max,prob=TRUE,col="RED",breaks=20)
+hist(mean,prob=TRUE,col="BLUE",breaks=20)
+  
+  
+```
+We can see that $\bar{x}$ is normally distributed (which also follows from the CLT) while the ML-estimate $X_{(n)}$ is not. We know that if FRC holds then the ML-estimate is always asymptotically normally distributed but since in this case FRC does not hold it is not certain that our ML-estimate is normally distribured. Since the Wald and likelihood ratio CI builds on that the ML-estimate is normally distributed, we see that it would be a bad idea to use those confidence intervals in this case. From the histogram we can also see that $\bar{x}$ is unbiased estimator of $\theta$ while $X_{(n)}$ is not, since it is always smaller than $\theta$
+
+##Problem 2)**
+
+```{r}
+
+ci1 <- function (x,e){
+ ci = 1/e*(x+c(-1,1)*1.96*sqrt(x))
+ if (ci[1] < 0)
+    ci[1] = ci[1]*-1
+ ci
+}
+ci2 <- function(x,e){
+  ci = 1/2*(2*x/e+1.96*1.96/e)+c(-1,1)*sqrt(1/4*(2*x/e+1.96*1.96*1/e)^2-x^2/e^2)
+  
+  if (ci[1] < 0)
+    ci[1] = ci[1]*-1
+ ci
+}
+ci3 <- function(x,e){
+ ci = x/(e*(1+c(1,-1)*1.96/sqrt(x)))
+ if (ci[1] < 0)
+    ci[1] = ci[1]*-1
+ ci
+}
+
+e <- 3.04; alpha <- 0.05
+lambda <- seq(0.1, to=8, length=1000)
+x <- 0:100 
+
+cols = c("RED","BLUE","GREEN")
+prob <- outer(x,lambda*e,dpois)
+for (i in 1:3){
+  
+  if (i == 1)
+    fun = ci1
+  else if (i==2)
+    fun = ci2
+  else
+    fun = ci3
+  
+  CImat <- sapply(x,function(x) { fun(x,e) } )
+  ind <- outer(CImat[1,], lambda, "<") &
+  outer(CImat[2,], lambda, ">") 
+  coverage <- apply(ind*prob, 2, sum)
+  print(coverage[1])
+  if (i == 1)
+    plot(lambda,coverage,col=cols[i],type="l")
+  else
+    lines(lambda,coverage,col=cols[i],type="l")
+}
+```
+
+
+It seems as if the blue one, which is the score CI when using $J(\lambda)$, seems to converge to the 95\% the fastest.

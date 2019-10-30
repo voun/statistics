@@ -1,0 +1,185 @@
+---
+title: "ex4"
+output: pdf_document
+---
+```{r}
+library(kknn)
+## y = f(x)+eps, linear regression, knn regression, loess
+## f??r att hitta f^(x)
+n = 500
+set.seed(0)
+p=2
+sigma = 0.3
+
+g1<-function(x){2*x/(1+abs(x)^1.5)}
+g2<-function(x){x^3/abs(x)^1.5}
+g3<-function(x){x} 
+
+mat = matrix(runif(n*p,-1,1),ncol=p)
+X1 = g1(mat)
+X2 = g2(mat)
+X3 = g3(mat)
+par(mfrow = c(1,3))
+plot(X1)
+plot(X2)
+plot(X3)
+
+sampleX <- function(n=500){
+  mat = matrix(runif(n*p,-1,1),ncol=p)
+  X = g1(mat)
+}
+
+f1dim<-function(x){ sin(8*x)/(1+(4*x)^2) }
+f <- function(X){
+  apply(X,1,function(x) f1dim(x[1]))
+}
+
+sampleY <- function(X){
+  f(X)+rnorm(500,0,sd=sigma)
+}
+## note difference between test error in bias variance tradeoff
+##here we make x and y random in train and x and y random test point
+## and calculate error!u
+M = 1000
+error = 0
+for(i in 1:M){
+  Xtrain = sampleX(500) ## get training
+  Ytrain = sampleY(Xtrain)
+  Xtest = sampleX(2000) ## get test
+  Ytest = sampleY(Xtest)
+  dfTrain = data.frame(x=Xtrain,y=Ytrain) ## put in frame
+  dfTest = data.frame(x=Xtest)
+  fit.kknn <- kknn(y~.,dfTrain,dfTest,k=8) ##train
+  pred = predict(fit.kknn) ##predict test data
+  error = error+sum((pred-Ytest)^2)
+}
+error = error/(M*2000)
+
+##hur bra ??r algoritmen n??r vi tr??nar p?? 500 points??
+
+
+```
+
+
+```{r}
+ValidationSet <- function(X,Y){ ##tar in  data
+  
+  ind = sample(1:nrow(X),nrow(X),replace=FALSE) ##shuffle, annars funkar ej repeated!
+  X = X[ind,]
+  Y = Y[ind]
+  
+  folds = cut(1:nrow(X),breaks=2,labels=FALSE)
+  ind = which(folds == 1)
+  Xtest = X[ind]
+  Ytest = Y[ind]
+  Xtrain = X[-ind]
+  Ytrain = Y[-ind]
+  
+  dfTrain = data.frame(x=Xtrain,y=Ytrain)
+  dfTest = data.frame(x=Xtest)
+  fit.kknn = kknn(y~.,dfTrain,dfTest,k=8)
+  pred = predict(fit.kknn)
+  
+  return(mean((pred-Ytest)^2))
+  
+}
+
+RepeatedValidationSet <- function(X,Y){ ##skattar true test error rate, slumpar random train och test
+  MSerrors = replicate(10,ValidationSet(X,Y)) ##k??r experiment 10 ggr och spara i en vektor
+  return(mean(MSerrors)) ## det vi vill kolla ??r hur bra algoritmen ??r!!
+}
+
+KfoldCV <- function(X,Y,K=10){
+  ind = sample(1:nrow(X),nrow(X),replace=FALSE) ##shuffle, annars funkar ej repeated!
+  X = X[ind,]
+  Y = Y[ind]
+  
+  error = rep(0,K)
+  folds = cut(1:nrow(X),breaks=K,labels=FALSE)
+  for(i in 1:K){
+    ind_test = which(folds == i)
+    Xtest = X[ind_test,]
+    Ytest = Y[ind_test]
+    Xtrain = X[-ind_test,]
+    Ytrain = Y[-ind_test]
+    
+    dfTrain = data.frame(x=Xtrain,y=Ytrain)
+    dfTest = data.frame(x=Xtest)
+
+    fit.kknn = kknn(y~.,dfTrain,dfTest,k=8)
+    pred = predict(fit.kknn)
+    
+    error[i] = mean((pred-Ytest)^2)
+  }
+  ##return(mean(error))
+  return(var(error))
+}
+
+
+
+RepeatedKfoldCV <- function(X,Y){
+  MSerrors = replicate(10,KfoldCV(X,Y))
+  return(mean(MSerrors))
+}
+
+LOOCV <- function(X,Y){
+  
+  K = nrow(X)
+  ind = sample(1:nrow(X),nrow(X),replace=FALSE) ##shuffle, annars funkar ej repeated!
+  X = X[ind,]
+  Y = Y[ind]
+  
+  error = rep(0,K)
+  folds = cut(1:nrow(X),breaks=K,labels=FALSE)
+  for(i in 1:K){
+    ind_test = which(folds == i)
+    Xtest = X[ind_test,]
+    Ytest = Y[ind_test]
+    Xtrain = X[-ind_test,]
+    Ytrain = Y[-ind_test]
+    dfTrain = data.frame(x1=Xtrain[,1],x2=Xtrain[,2],y=Ytrain)
+    dfTest = data.frame(x1=Xtest[1],x2=Xtest[2])
+
+    fit.kknn = kknn(y~.,dfTrain,dfTest,k=8)
+    pred = predict(fit.kknn)
+    
+    error[i] = mean((pred-Ytest)^2)
+  }
+  return(mean(error))
+}
+
+```
+
+```{r}
+
+##varje iteration skattar test error, nu hittar f??rdelningen
+##av denna skattning
+EvaluateOnSimulation <- function(estFun,iterations=200){
+  
+  result <- numeric(iterations)
+  for(i in 1:iterations){
+    X = sampleX()
+    Y = sampleY(X)
+    result[i] = estFun(X,Y)
+  }
+  return(result)
+}
+
+estVS = EvaluateOnSimulation(ValidationSet)
+estVSrep = EvaluateOnSimulation(RepeatedValidationSet)
+estKfoldCV = EvaluateOnSimulation(KfoldCV)
+estKfoldCVrep = EvaluateOnSimulation(RepeatedKfoldCV,200)
+estLOOCV = EvaluateOnSimulation(LOOCV,200)
+estimates = cbind(estVS,estVSrep,estKfoldCV,estKfoldCVrep,estLOOCV)
+boxplot(estimates)
+abline(h=error) ## we see that the
+                                
+```
+
+
+```{r}
+bias = apply(estimates,2,mean)-error
+var = apply(estimates,2,var)
+
+```
+

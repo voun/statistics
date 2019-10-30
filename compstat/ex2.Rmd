@@ -1,0 +1,138 @@
+---
+title: "ex2"
+output: html_document
+---
+
+```{r}
+set.seed(0)
+n<-100
+z1<-rnorm(n)
+z2<-rnorm(n)
+M=matrix(c(1,1,0.1,-0.1),2,2)
+X=t(M%*%rbind(z1,z2))
+beta<-c(0.5,-1.0)
+x1=X[,1]
+x2=X[,2]
+
+y=5+beta[1]*x1+beta[2]*x2 +rnorm(n)
+
+plot(x1,type="p",col="blue")
+#lines(x2,type="p",col="green")
+
+fit = lm(y~x1+x2)
+summary(fit)
+X = as.matrix(cbind(1,X))
+
+XtXinv = solve(t(X)%*%X)
+bhat = XtXinv%*%t(X)%*%y
+residuals = (y-X%*%bhat)
+RSS = sum(residuals^2)
+RSE = sqrt(1/(n-3)*RSS)
+
+se = RSE*sqrt(XtXinv[2,2])
+t_val = bhat[2]/se
+p_val = 2*(1-pt(t_val,97)) ##under H0: beta1 = 0, prob of getting this or more extreme, can't reject H0, could be beta1 = 0
+p_val
+
+##Can say either beta2 not 0 or beta3 not 0 but when doing individual test
+##can't reject. This is because correlation between predictor vars
+anova(fit,lm(y~1))
+
+mean = mean(y)
+TSS = sum((y-mean)^2)
+R2 = 1-RSS/TSS
+
+
+fit2 = lm(y~x1)
+summary(fit2) ##so now coeff of x1 changed sign so be careful with 
+              ##interpreting the coefficients!
+```
+
+```{r}
+
+library(ISLR)
+data(Carseats) ##l??ser in dataset i workspace
+shelveloc=Carseats$ShelveLoc
+sales=Carseats$Sales
+advertising=Carseats$Advertising
+fit<-lm(sales~shelveloc+advertising)
+summary(fit)
+
+good = (shelveloc == "Good")*1
+medium = (shelveloc == "Medium")*1
+bad = (shelveloc == "Bad")*1
+fit_a = lm(sales~advertising+good+medium)
+summary(fit_a)
+
+fit_b = lm(sales~advertising+bad+good)
+summary(fit_b)
+
+##y = b0+b1*adv+d1*bad+d2*good, so d2 means difference in sale
+## when going from medium to good, i.e increase in 2.8
+
+fit_c = lm(sales~bad+medium+good+advertising)
+# THIS DOESNT WORK SINCE COLUMNS NOW NOT LINEAR INDEPENDENT!
+# THAT IS WHY WE FOR K CATEGORIES USE K-1 DUMMIES!
+# SUM COLUMNS CORRESPONDING TO CATEGORICAL VARIABLES!
+
+fit_c = lm(sales~0+bad+medium+good+advertising)
+summary(fit_c)
+max(abs(fitted(fit_a)-fitted(fit_b)))
+
+# difference of coefficients interpret as going from one 
+# category to another
+
+fit_d = lm(sales~advertising+bad)
+anova(fit_d,fit_a)
+
+##so these are not the same and need to distinguish between all categories!
+
+
+```
+
+```{r}
+#airline <- scan("http://stat.ethz.ch/Teaching/Datasets/airline.dat")
+par(mfrow = c(1,2))
+plot(airline,type="p",col="blue",xlab="month",ylab="passengers")
+plot(log(airline),type="p",col="blue",xlab="month",ylab="passengers")
+
+x1 = rep(c(1,rep(0,11)),12)
+x2 = rep(c(c(0,1),rep(0,10)),12)
+x3 = rep(c(c(0,0,1),rep(0,9)),12)
+x4 = rep(c(c(0,0,0,1),rep(0,8)),12)
+x5 = rep(c(c(0,0,0,0,1),rep(0,7)),12)
+x6 = rep(c(c(0,0,0,0,0,1),rep(0,6)),12)
+x7 = rep(c(c(0,0,0,0,0,0,1),rep(0,5)),12)
+x8 = rep(c(c(0,0,0,0,0,0,0,1),rep(0,4)),12)
+x9 = rep(c(c(0,0,0,0,0,0,0,0,1),rep(0,3)),12)
+x10 = rep(c(c(0,0,0,0,0,0,0,0,0,1),rep(0,2)),12)
+x11 = rep(c(c(0,0,0,0,0,0,0,0,0,0,1),rep(0,1)),12)
+x12 = rep(c(0,0,0,0,0,0,0,0,0,0,0,1),12)
+t = 1:144
+fit_month = lm(log(airline) ~ 0+t+x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+x12)
+##ej bara vilken m??nad som p??verkar utan ??ven tiden!
+##eftersom har med alla 12 kategorier (m??nad 1,2,..,12) s?? ska
+##ej ha med intercept eftersom annars ej inverterbar
+summary(fit_month) #har 0.993 adjusted R2 s?? bra modell!!
+cols = factor(rep(1:12,12)) ##de som har samma grejj f??r samma f??rg!
+plot(exp(fitted.values(fit_month)),col=cols)
+plot(residuals(fit_month))
+
+## beta tolkas som: om hoppar fram 1 ??r s?? ??kar antalet passagerare
+## med en faktor exp(12*beta)
+
+## seems to grow exponentially so perhaps logarithm is linear
+
+#vill nu testa om n??gon skillnad mellan modellerna om kollar varje m??nad
+##gentemot vilken ??rstid (season det ??r) s?? 4 kategorier
+
+s1 = rep(c(0,0,1,1,1,0,0,0,0,0,0,0),12)
+s2 = rep(rep(c(0,0,0,0,0,1,1,1,0,0,0,0),12))
+s3 = rep(rep(c(0,0,0,0,0,0,0,0,1,1,1,0),12))
+s4 = rep(rep(c(1,1,0,0,0,0,0,0,0,0,0,1),12))
+
+fit_season = lm(log(airline)~0+t+s1+s2+s3+s4)
+anova(fit_month,fit_season)
+plot(fitted.values(fit_season))
+##s?? visar sig vara skillnad. Ska allts?? ta in m??nad
+```

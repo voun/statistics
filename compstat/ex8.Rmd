@@ -1,0 +1,207 @@
+---
+title: "ex8"
+output: html_document
+---
+```{r}
+
+## chi-2-test testar om tv?? KATEGORISKA variabler ??r oberoende av varandra,
+## dvs vad den ena ??r p??verkar ej vad den andra ??r. Om jag vanliga numeriska/kontinuerliga variabler s?? om oberonde ska corr vara runt 0 och kan g??ra permutationstest f??r att testa detta. Om jag kategoriska s?? fungerar detta ej
+
+
+set.seed(1)
+n <- 30
+p <- 50
+# relevant covariate
+x_true <- sample(c(0:1),size = n,replace = T)
+# noise covariates
+x <- matrix(sample(c(0:1),size=n*p,replace = T),ncol=p,nrow=n)
+# combination of the two
+x <- cbind(x_true, x)
+# response
+y <- ifelse(x[,1]==0, 0, sample(c(0:1), size = n, replace = T))
+
+p.values = rep(0,51)
+for(i in 1:51){
+  table = table(x[,i],y) #ger en contingency table! counts
+  p.val = chisq.test(table)$p.value
+  p.values[i] = p.val
+}
+
+sum(p.values <= 0.05) #s?? f??rkastar bara 2 stycken, s?? tv?? kolumner p??verkar y. Detta ??r en f??r mycket
+
+# vill testa om en kolumn i x ??r oberoende av y. 
+# H0 ??r oberoende och HA ??r beroende
+
+#tydligt att bara den f??rsta kolumnen ??r beroende av y
+
+# Vi g??r Bonferroni correction f??r att h??lla FWER <= 0.05 strong control
+# s?? f??rkasta om p-v??rdet ??r <= 0.05/m = 0.05/51
+
+sum(p.values <= 0.05/51) # nu f??rkastar vi ingen vilket ??r f??r h??rt
+
+# Vi g??r nu Westfall Young som ger svag kontroll av FWER dvs bara
+# under global null ( som vi ej har) f??r vi kontroll <= 0.05
+# Vi ska simulera fram ett delta och f??rkastar om p-v??rdet mindre ??n detta
+
+statistic = rep(0,1000)
+for(j in 1:1000){
+  #under global null kan permutera
+  newy = sample(y,length(y),replace=FALSE)
+  
+  pvals = rep(0,51)
+  for(i in 1:51){
+    table = table(x[,i],newy)
+    p.val = chisq.test(table,simulate.p.value = TRUE)$p.value
+    pvals[i] = p.val
+  }
+  statistic[j] = min(pvals)
+}
+
+#the last method we have seen for controlling the FDR is Benjamin-Hochberg and requires independent tests
+
+rej = quantile(statistic,0.05)
+sum(p.values <= rej) #f??rkastar nu bara en vilket ??r det vi vill ha!
+```
+
+
+```{r}
+## n??r har data s?? kan hitta b??sta modellen mha best subset selection
+## n??r anv??nder BIC, Mallow's Cp, adjusted R2, eller CV
+# f??r varje s??n algoritm kan g??ra CV och ta test error och sedan
+## ta den b??sta. Detta ??r inga problem eftersom algoritmen ??r ej framtagen ur datan. Det ??r som att vi testar proceduren: hitta de k variablerna som p??verakar target mest och g??r linj??r rgression: test error?
+
+set.seed(5)
+library(ISLR)
+library(leaps)
+data(Hitters)
+Hitters = na.omit(Hitters)
+
+best_modelBIC <- function(train_inds){
+  regfit = regsubsets(Salary~.,data=Hitters[train_inds,],nvmax=19)
+  summary = summary(regfit)
+  bics = summary$bic
+  ind = which(bics == min(bics))
+  return(coef(regfit,ind))
+}
+
+best_modeladjR2 <- function(train_inds){
+  regfit = regsubsets(Salary~.,data=Hitters[train_inds,],nvmax=19)
+  summary = summary(regfit)
+  adjR2s = summary$adjr2
+  ind = which(adjR2s == max(adjR2s))
+  return(coef(regfit,ind))
+}
+
+best_modelCp <- function(train_inds){
+  regfit = regsubsets(Salary~.,data=Hitters[train_inds,],nvmax=19)
+  summary = summary(regfit)
+  cps = summary$cp
+  ind = which(cps == min(cps))
+  return(coef(regfit,ind))
+}
+
+best_modelCV <- function(train_inds){ #intercept finns nog alltid med i alla modeller!
+  data = Hitters[train_inds,]
+  n = dim(data)[1]
+  
+  val.errors = rep(0,19)
+  folds = cut(1:n,breaks=10,labels=FALSE) #varje i denna har en siffra som anger vilket fold den tillh??r
+  for(i in 1:10){
+    inds = which(folds == i) ##detta ger ju test
+    train = data[-inds,]
+    test = model.matrix(Salary~.,data[inds,]) #design matrix with 1 column in beginning. No salary
+    regfit = regsubsets(Salary~.,data=train,nvmax=19)
+    
+    for(j in 1:19){
+      coefi = coef(regfit,id=j)
+      pred = test[,names(coefi)]%*%coefi
+      val.errors[j] = val.errors[j]+mean((data$Salary[inds]-pred)^2)
+    }
+  }
+  val.errors = val.errors/10
+  ind = which(val.errors == min(val.errors))
+  
+  regfit = regsubsets(Salary~.,data=data,nvmax=19)
+  return(coef(regfit,ind))
+}
+
+errors = rep(0,4)
+data = Hitters
+n = dim(data)[1]
+folds = cut(1:n,breaks=4,labels=FALSE)
+
+for( i in 1:4){
+    inds = which(folds == i)
+    train = data[-inds,]
+    test = model.matrix(Salary~.,data[inds,]) #design matrix with 1 column in beginning. No salary
+    
+    m1 = best_modelBIC(inds)
+    m2 = best_modeladjR2(inds)
+    m3 = best_modelCp(inds)
+    m4 = best_modelCV(inds)
+    
+    pred1 = test[,names(m1)]%*%m1
+    pred2 = test[,names(m2)]%*%m2
+    pred3 = test[,names(m3)]%*%m3
+    pred4 = test[,names(m4)]%*%m4
+    errors[1] = errors[1]+mean((data$Salary[inds]-pred1)^2)
+    errors[2] = errors[2]+mean((data$Salary[inds]-pred2)^2)
+    errors[3] = errors[3]+mean((data$Salary[inds]-pred3)^2)
+    errors[4] = errors[4]+mean((data$Salary[inds]-pred4)^2)
+}
+errors = errors/4
+ind = which(errors == min(errors)) #nummer tv??, e.g adjR2 ger l??gst test error p?? ungef??r 63k
+
+full.model = best_modeladjR2(1:263)
+
+```
+
+```{r}
+library(glmnet)
+library(hdi)
+data(riboflavin)
+y = riboflavin$y
+x = riboflavin$x
+
+grid = 10^seq(10,-2,length=100)
+ridge.mod = glmnet(x,y,alpha=0,lambda=grid)
+dim(coef(ridge.mod)) #rader ??r predictors och kolumner lambda
+coef(ridge.mod)[,50]
+
+lasso.mod = glmnet(x,y,alpha=1,lambda=grid)
+
+#vi har nu tv?? procedurer: f??r data och ta fram b??sta lambda f??r lasso
+# eller f??r data och ta fram b??sta lambda f??r ridge.
+# Vad ??r test error f??r dessa tv?? procedurer?
+
+errorLasso = 0
+errorRidge = 0
+folds = cut(1:71,breaks=7,labels=FALSE)
+for(i in 1:7){
+  inds = which(folds == i)
+  xtrain = x[-inds,]
+  xtest = x[inds,]
+  ytrain = y[-inds]
+  ytest = y[inds]
+  
+  
+  lamRidge = cv.glmnet(xtrain,ytrain,alpha=0)$lambda.min
+  ridge.mod = glmnet(xtrain,ytrain,alpha=0,lambda=lamRidge)
+  ridge.pred = predict(ridge.mod,xtest)
+  errorRidge = errorRidge + mean((ridge.pred-ytest)^2)
+  
+  lamLasso = cv.glmnet(xtrain,ytrain,alpha=1)$lambda.min
+  lasso.mod = glmnet(xtrain,ytrain,alpha=1,lambda=lamLasso)
+  lasso.pred = predict(lasso.mod,xtest)
+  errorLasso = errorLasso + mean((lasso.pred-ytest)^2)
+}
+errorRidge = errorRidge/7
+errorLasso = errorLasso/7
+# the Lasso-procedure has lowest test error
+
+lamLasso = cv.glmnet(x,y,alpha=1)$lambda.min
+lasso.mod = glmnet(x,y,alpha=1,lambda=lamLasso)
+
+```
+
+

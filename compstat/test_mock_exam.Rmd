@@ -1,0 +1,72 @@
+---
+title: "test_mock_exam"
+output: pdf_document
+---
+
+```{r}
+set.seed(88)
+X <- matrix(rnorm(100), ncol = 5)
+y <- X %*% c(0.4, 0.5, 0.3, 0.8, 0.2) + rnorm(20)
+fit1 = lm(y~ X[,1]+X[,2]+X[,3]+X[,4]+X[,5])
+statistic1 = summary(fit1)$fstatistic[1]
+
+res = rep(0,10000)
+for(i in 1:10000){
+  new_y = sample(y,length(y),replace=FALSE)
+  fit = lm(new_y ~ X[,1]+X[,2]+X[,3]+X[,4]+X[,5])
+  res[i] = summary(fit)$fstatistic[1]
+}
+(sum(res >= statistic1)+1)/(10001)
+```
+
+
+```{r}
+library(ISLR)
+library(leaps)
+data(Credit)
+data = Credit[,-1]
+reg = regsubsets(Balance~.,nvmax=11,data=data,method="forward")
+```
+
+```{r}
+library(boot)
+set.seed(0)
+
+n <- 200
+theta <- qexp(0.75,1) 
+
+## function that generates samples
+generateSamples <- function (n = 200) {
+  return(rexp(n, rate = 1))
+}
+
+boot.fun <- function(data, ind){
+  boot.x <- data[ind]
+  boot.theta <- quantile(boot.x,0.75)
+  return(boot.theta);
+}
+
+## function to compute a bootstrap CI
+computeCI <- function (samples) {
+  res.boot <- boot(data = samples, statistic = boot.fun, R = 200)
+  ci.boot <- boot.ci(res.boot, conf = 0.95, type = c("basic"))
+  ci.lower <- ci.boot$basic[4]
+  ci.upper <- ci.boot$basic[5]
+  return(c(ci.lower, ci.upper))
+}
+
+iterations <- 100
+contained <- 0
+for (i in 1:iterations) {
+  samples <- generateSamples()
+  CI <- computeCI(samples)
+
+  ## if CI contains theta, increase variable "contained"
+  if (theta >= CI[1] & theta <= CI[2]) {
+    contained <- contained+1
+  }
+}
+
+contained/iterations
+```
+

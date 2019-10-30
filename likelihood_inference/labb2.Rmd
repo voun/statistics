@@ -1,0 +1,29 @@
+---
+title: "Lab 2"
+author: "Andreas Dahlberg"
+output:
+  pdf_document: default
+---
+
+#Problem 4b) and 4c)
+```{r}
+data <- get(load("exercise2.RData"))
+h <- hist(data,plot=FALSE,breaks=20)
+plot(h,col="red",ylim=c(0,25))
+
+mu_1 = 1/length(data)*sum(data)
+mu_2 = 1/length(data)*sum(data*data)
+
+alpha = mu_1^2/(mu_2-mu_1^2)
+beta = mu_1/(mu_2-mu_1^2)
+
+x <- seq(min(h$breaks),max(h$breaks),length=100)
+lines(x,dgamma(x,shape = alpha,rate = beta) *length(x)*diff(h$breaks)[1],col="blue")
+
+alpha
+beta
+
+```
+The above R-code plots the pdf of the gamma distribution (with the MM-estimates of the shape and rate) in the same figure as the histogram of the data. We can see that the the pdf and the histogram looks the same which means that the MM-estimates are pretty good.
+
+data

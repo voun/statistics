@@ -1,0 +1,68 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+```{r}
+library(lattice)
+library(LearnBayes)
+options(digits = 3)
+# p true parameter perc of college students sleeping >= 8 hours
+# here we use discrete prior
+p = seq(0.05, 0.95, by=0.1)
+# en viss tro om parametern från början, tex kolla tidigare studie
+# från 80 talet i ryssland
+prior = c(1, 5.2, 8, 7.2, 4.6, 2.1, 0.7, 0.1, 0, 0)
+prior = prior/sum(prior)
+# L(p) = P(får denna data | p) där s = 11, f = 16
+# L(p) = (27 over 11)*p^11*(1-p)^16
+
+#nästa tro om parametern efter fått värden
+post = pdisc(p, prior, c(11,16))
+PRIOR = data.frame("prior", p, prior)
+POST = data.frame("posterior", p, post)
+names(PRIOR) = c("Type", "P", "Probability")
+names(POST) = c("Type", "P", "Probability")
+data = rbind(POST,PRIOR)
+xyplot(Probability~P | Type, data = data, type="h", col="black", lwd=3)
+
+pred = pdiscp(p, post, 20, 0:20) #0:20 vilka värden
+#pred kan anta kan 20 hur många
+which(pred == max(pred)) #is 8 so 7 students
+
+```
+
+
+```{r}
+library(lattice)
+library(LearnBayes)
+#now assume prior is beta distributed
+quantile1 = list(p=0.5,x=0.3)
+quantile2 = list(p=0.9,x=0.5)
+params = beta.select(quantile1,quantile2)
+s = 11
+f = 16
+a = params[1]
+b = params[2]
+x = seq(0,1,length = 100)
+
+plot(x, dbeta(x, a, b), lty = 1, xlab="p", ylab="density", type="l", ylim=c(0,5), main="some plots")
+lines(x, dbeta(x, s+1, f+1), lty=2, type="l")
+lines(x, dbeta(x, a+s, b+f), lty=3, type="l")
+legend("topright", legend = c("prior", "likelihood", "posteior"),
+       lty = c(1,2,3))
+## posterior är alltid den i mitten!
+## den tar hänsyn till både prior och likelihood (datan)
+
+#likely that p >=0.5?
+1-pbeta(0.5, a+s, b+f) #0.07 so very small
+qbeta(c(0.025, 0.975), a+s, b+f) # (0.23, 0.54) 95% cred interval
+
+##usually hard to evaluate post so do MCMC/Gibbs sampling
+##and if can sample from it then can find CI and est and so on
+data = rbeta(10000, a+s, b+f)
+hist(data, prob=TRUE, col="blue")
+est = mean(hist)
+ci = quantile(data, probs = c(0.025, 0.975)) #almost same results
+
+```
+

@@ -1,0 +1,76 @@
+---
+title: "ex1"
+output: pdf_document
+---
+```{r}
+
+x <- seq(0,10,length=40)
+X = as.matrix(cbind(1,x))
+
+slopes = rep(0,100)
+b0 = 1
+b1 = 2
+par(mfrow = c(3,2))
+for (k in 1:250){
+  
+  y = b0+b1*x+rnorm(40,0,5)
+  fit = lm(y~x)
+  if(k <= 3){
+    plot(x,y,col="green",type="p",xlab="x",ylab="y")
+    abline(fit)
+    #res = residuals(fit)
+    #vals = fitted.values(fit)
+    #plot(vals,res,col="red",type="p",xlab="fitted vals",ylab="residuals")
+    plot(fit,which = 1)
+  }
+  
+  slope = fit$coef[2]
+  slopes[k] = slope
+}
+
+mean_slope = mean(slopes)
+emp_var = var(slopes)
+true_var = 25*(solve(t(X)%*%X))[2,2]
+
+hist(slopes,col="blue",prob="true",ylab="",breaks=25)
+lines(seq(1.0,3.0,length=50),dnorm(seq(1.0,3.0,length=50),2,sqrt(true_var)),col="red")
+
+
+```
+
+```{r}
+library(MASS)
+set.seed(21)
+Sigma <- matrix(0.7,40,40)
+diag(Sigma) <- 1
+
+x <- rnorm(40,20,3)
+X = as.matrix(cbind(1,x))
+
+slopes = rep(0,100)
+b0 = 1
+b1 = 2
+par(mfrow = c(3,2))
+for (k in 1:100){
+  #y = y <- 1 + 2 * x + 5 * (1 - rchisq(40, df = 1)) / sqrt(2)
+  #y <- 1 + 2 * x + 5 * rnorm(40, mean = x^2 / 5 - 1, sd = 1)
+  #y <- 1 + 2 * x + 5 * rnorm(length(x), mean = 0, sd = (x-14)^2 / 30)
+  #y <- 1 + 2 * x + 5 * mvrnorm(n = 1, mu = rep(0, 40), Sigma = Sigma)
+  fit = lm(y~x)
+  if(k <= 3){
+    plot(x,y,col="green",type="p",xlab="x",ylab="y")
+    abline(fit)
+    res = residuals(fit)
+    vals = fitted.values(fit)
+    plot(vals,res,col="red",type="p",xlab="fitted vals",ylab="residuals")
+  }
+  slope = fit$coef[2]
+  slopes[k] = slope
+}
+
+hist(slopes,col="blue",prob="true",ylab="")
+qqnorm(slopes)
+qqline(slopes)
+
+```
+

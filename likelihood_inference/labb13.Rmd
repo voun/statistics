@@ -1,0 +1,101 @@
+---
+title: "labb13"
+author: "Andreas Dahlberg"
+output: pdf_document
+---
+
+
+```{r}
+library(emdbook)
+library(lestat)
+
+#rnormgamma <- function(n, mu, lambda, alpha, beta) {
+#  if (length(n) > 1) 
+#    n <- length(n)
+#  tau <- rgamma(n, alpha, beta)
+#  x <- rnorm(n, mu, sqrt(1/(lambda*tau)))
+#  data.frame(x = x,tau=tau)
+#}
+
+x = c(29.04, 34.06, 31.32, 28.51, 31.60, 35.55, 26.68, 30.91, 30.38, 30.28)
+n = length(x)
+
+v = mean(x)
+l = n
+a = n/2
+b = n*var(x)/2
+
+dnormalgamma <- function(mu, k) {
+return(dnorm(mu, mean = v, sd = sqrt(1/(k * l))) * dgamma(k, shape = a,
+rate = b))
+}
+
+dmu <- 5
+mu <- seq(mean(x) - dmu, mean(x) + dmu, l = 200)
+k <- seq(1e-05, 0.55, l = 200)
+z = outer(mu,k,dnormalgamma)
+contour(mu,k,z,ylab="k",nlevels=15,xlab="mu")
+
+delta.mu = diff(mu)[1]
+delta.k = diff(k)[1]
+range = range(z)
+
+vol_under_cont <- function(val){
+  inds = z >= val
+  sum(z[inds]*delta.mu*delta.k)
+}
+
+to_optim <- function(x){
+  abs(vol_under_cont(x)-0.95)
+}
+val <- optimize(to_optim, interval = c(0.001, 0.15), maximum = FALSE)$min
+contour(mu,k,z,ylab="k",xlab="mu",levels=c(val),add=TRUE,col="GREEN")
+
+#HPDregionplot(rnormgamma(100000,v,l,a,b), prob = 0.90, col="red",add=TRUE)
+
+log_likeli <- function(x_){
+  mu = x_[1]
+  k = x_[2]
+  sum(dnorm(x,mu,sqrt(1/k),log=TRUE))
+}
+
+opt = optim(c(30,0.5),function(x)-log_likeli(x),hessian=TRUE)
+ML = opt$par
+max = log_likeli(ML)
+se = sqrt(diag(solve(opt$hessian)))
+
+grid = expand.grid(mu,k)
+z_new = apply(grid,1,log_likeli)
+z_new = array(z_new,c(200,200))
+
+wald_mu = ML[1]+c(-1,1)*1.96*se[1]
+wald_k = ML[2]+c(-1,1)*1.96*se[2]
+
+rect(xleft=wald_mu[1],xright=wald_mu[2],ybottom=wald_k[1],ytop=wald_k[2],col = rgb(0.7, 0.7, 0.7, 0.4))
+.filled.contour(mu,k,z_new,levels=c(-qchisq(0.95,2)/2+max,max),col= rgb(1, 0, 0, 0.3))
+```
+
+
+```{r}
+X = rexp(10000,2)
+Y = rexp(10000,2)
+
+cdf <- function (x,y){
+  1-x/(x+y)
+}
+par(mfrow = c(1,2))
+hist(pexp(Y,1/X),col = "red",prob=TRUE)
+
+vec = c()
+for (i in 1:length(X)){
+  vec = append(vec,cdf(X[i],Y[i]))
+}
+hist(vec,col="blue",prob=TRUE)
+
+```
+
+
+
+
+
+
